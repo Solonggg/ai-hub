@@ -18,7 +18,11 @@
 
 {PLAN_REFERENCE}
 
-## 需要评审的 Git 范围
+## 需要评审的变更范围
+
+**范围类型：** `{REVIEW_SCOPE}`
+
+如果给了 commit range：
 
 **Base：** `{BASE_SHA}`  
 **Head：** `{HEAD_SHA}`
@@ -26,6 +30,13 @@
 ```bash
 git diff --stat {BASE_SHA}..{HEAD_SHA}
 git diff {BASE_SHA}..{HEAD_SHA}
+```
+
+如果评审的是未提交变更：
+
+```bash
+git diff --stat
+git diff
 ```
 
 ## 评审清单
@@ -58,6 +69,8 @@ git diff {BASE_SHA}..{HEAD_SHA}
 - 实现是否与 spec 一致？
 - 是否出现范围蔓延？
 - 破坏性变更是否已说明？
+- 如果本次属于新需求，`/doc/feat/feat_xxxx.md` 是否已更新？
+- 若存在 SQL、参数、接口、资源、版本依赖等改动，版本说明里是否记录完整？
 
 ### 生产准备度
 
@@ -65,6 +78,7 @@ git diff {BASE_SHA}..{HEAD_SHA}
 - 是否考虑向后兼容？
 - 文档是否完整？
 - 是否存在明显 bug？
+- 是否仍有“代码写完后直接提交 git”的流程风险？
 
 ## 输出格式
 

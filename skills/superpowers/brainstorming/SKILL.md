@@ -29,8 +29,9 @@ description: "在进行任何创造性工作之前使用，例如创建功能、
 6. **展示设计**：按复杂度分段展示，并在每段后征求确认
 7. **写设计文档**：保存到 `doc/specs/<需求目录名>/design.md`
 8. **文档自审**：快速检查 `requirements.md` 与 `design.md` 的占位符、冲突、歧义、范围
-9. **请用户审阅文档**：在继续前请用户查看 `requirements.md` 与 `design.md`
-10. **切换到实现规划**：调用 `writing-plans` skill 生成 `tasks.md`
+9. **明确交付记录要求**：确认本次新需求完成后需要补充 `/doc/feat/feat_xxxx.md`，并识别 SQL、参数、接口、资源、版本依赖等需要同步记录的变更
+10. **请用户审阅文档**：在继续前请用户查看 `requirements.md` 与 `design.md`
+11. **切换到实现规划**：调用 `writing-plans` skill 生成 `tasks.md`
 
 ## 流程图
 
@@ -47,6 +48,7 @@ digraph brainstorming {
     "用户批准设计？" [shape=diamond];
     "写设计文档" [shape=box];
     "文档自审\n（直接修正文档）" [shape=box];
+    "明确交付记录要求" [shape=box];
     "用户审阅文档？" [shape=diamond];
     "调用 writing-plans" [shape=doublecircle];
 
@@ -63,7 +65,8 @@ digraph brainstorming {
     "用户批准设计？" -> "分段展示设计" [label="否，需要修改"];
     "用户批准设计？" -> "写设计文档" [label="是"];
     "写设计文档" -> "文档自审\n（直接修正文档）";
-    "文档自审\n（直接修正文档）" -> "用户审阅文档？";
+    "文档自审\n（直接修正文档）" -> "明确交付记录要求";
+    "明确交付记录要求" -> "用户审阅文档？";
     "用户审阅文档？" -> "确定需求目录并写需求文档" [label="要求修改需求"];
     "用户审阅文档？" -> "写设计文档" [label="要求修改设计"];
     "用户审阅文档？" -> "调用 writing-plans" [label="已批准"];
@@ -122,6 +125,9 @@ digraph brainstorming {
 - 如果目录不存在，先自动创建目录，再写文档
 - 将确认过的需求写入 `doc/specs/<需求目录名>/requirements.md`
 - 将确认过的设计写入 `doc/specs/<需求目录名>/design.md`
+- 对于新需求，设计文档中必须明确：完成后要补充 `/doc/feat/feat_xxxx.md`
+- `feat_xxxx.md` 的 `xxxx` 优先沿用项目既有版本号命名；如果当前上下文没有明确版本号或文件名，就在设计文档里明确写“待用户确认 feat 文件名”，不能跳过
+- 如果预期存在 SQL、参数、接口、资源、版本依赖等变更，设计文档中必须先列出这些记录项，后续完成实现时同步落到 `/doc/feat/feat_xxxx.md`
 - `需求目录名` 的格式固定为 `yyyyMMdd中文功能名`，例如 `20260407护理管理新增病例讨论`
 - 其中 `yyyyMMdd` 是**首次创建需求文档当天**的日期，`中文功能名` 是需求描述的中文简要表达
 - 一旦 `requirements.md` 已创建成功，`需求目录名` 就被视为已确定；之后修改 `design.md`、生成 `tasks.md`、评审、执行时都必须直接沿用该目录

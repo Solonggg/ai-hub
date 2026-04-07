@@ -12,8 +12,9 @@ Task 工具（superpowers:code-reviewer）：
 
   WHAT_WAS_IMPLEMENTED: [来自实现者报告]
   PLAN_OR_REQUIREMENTS: [plan-file] 中的任务 N
-  BASE_SHA: [任务开始前的提交]
-  HEAD_SHA: [当前提交]
+  REVIEW_SCOPE: [working tree diff 或 commit range]
+  BASE_SHA: [任务开始前的提交，如适用]
+  HEAD_SHA: [当前提交，如适用]
   DESCRIPTION: [任务摘要]
 ```
 
@@ -24,5 +25,7 @@ Task 工具（superpowers:code-reviewer）：
 - 实现是否遵循了计划中给定的文件结构？
 - 这次改动是否新建了已经过大的文件，或显著把现有文件继续做大？
   不要对历史遗留的大文件吹毛求疵，只关注这次改动新增的问题。
+- 是否有人为了推进流程而直接 `git commit`？
+- 如果是新需求，对应的 `/doc/feat/feat_xxxx.md` 是否已同步更新？
 
 **评审者应返回：**Strengths、Issues（Critical / Important / Minor）、Assessment

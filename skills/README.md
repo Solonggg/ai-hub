@@ -10,7 +10,7 @@
 - `superpowers/`：流程型技能，如 `using-superpowers`、`systematic-debugging`、`verification-before-completion`。
 - `iho-java/`：IHO Java 项目开发规范。
 - `iho-db-pgsql/`：IHO PostgreSQL DDL 设计规范。
-- `spec/`：需求、设计、任务三段式 spec 技能与模板。
+- `spec/`：简易版的需求、设计、任务三段式 spec 技能与模板。
 - `wangjie-defaults/`：全局默认行为规范。
 
 单个 skill 目录通常包含：
