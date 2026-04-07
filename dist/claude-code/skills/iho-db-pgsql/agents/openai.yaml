@@ -1,0 +1,4 @@
+interface:
+  display_name: "IHO DB PGSQL"
+  short_description: "IHO 项目 PostgreSQL DDL 设计规范"
+  default_prompt: "使用 $iho-db-pgsql 按 IHO 项目风格设计或评审 PostgreSQL DDL，并将结果整理到 doc/specs/ddl-design.md。"

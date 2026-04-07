@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "defaults": {
+    "owner": "wangjie",
+    "root": "/Users/wangjie/ai-hub/skills"
+  },
+  "skills": [
+    {
+      "id": "skill-creator",
+      "path": "skills/.system/skill-creator",
+      "source": "codex-system",
+      "enabled": ["codex", "gpt-idea", "claude-code", "claude-ide"]
+    },
+    {
+      "id": "skill-installer",
+      "path": "skills/.system/skill-installer",
+      "source": "codex-system",
+      "enabled": ["codex", "gpt-idea", "claude-code", "claude-ide"]
+    },
+    {
+      "id": "brainstorming",
+      "path": "skills/superpowers/brainstorming",
+      "source": "codex-superpowers",
+      "enabled": ["codex", "gpt-idea", "claude-code", "claude-ide"]
+    },
+    {
+      "id": "dispatching-parallel-agents",
+      "path": "skills/superpowers/dispatching-parallel-agents",
+      "source": "codex-superpowers",
+      "enabled": ["codex", "gpt-idea", "claude-code", "claude-ide"]
+    },
+    {
+      "id": "executing-plans",
+      "path": "skills/superpowers/executing-plans",
+      "source": "codex-superpowers",
+      "enabled": ["codex", "gpt-idea", "claude-code", "claude-ide"]
+    },
+    {
+      "id": "finishing-a-development-branch",
+      "path": "skills/superpowers/finishing-a-development-branch",
+      "source": "codex-superpowers",
+      "enabled": ["codex", "gpt-idea", "claude-code", "claude-ide"]
+    },
+    {
+      "id": "receiving-code-review",
+      "path": "skills/superpowers/receiving-code-review",
+      "source": "codex-superpowers",
+      "enabled": ["codex", "gpt-idea", "claude-code", "claude-ide"]
+    },
+    {
+      "id": "requesting-code-review",
+      "path": "skills/superpowers/requesting-code-review",
+      "source": "codex-superpowers",
+      "enabled": ["codex", "gpt-idea", "claude-code", "claude-ide"]
+    },
+    {
+      "id": "subagent-driven-development",
+      "path": "skills/superpowers/subagent-driven-development",
+      "source": "codex-superpowers",
+      "enabled": ["codex", "gpt-idea", "claude-code", "claude-ide"]
+    },
+    {
+      "id": "systematic-debugging",
+      "path": "skills/superpowers/systematic-debugging",
+      "source": "codex-superpowers",
+      "enabled": ["codex", "gpt-idea", "claude-code", "claude-ide"]
+    },
+    {
+      "id": "test-driven-development",
+      "path": "skills/superpowers/test-driven-development",
+      "source": "codex-superpowers",
+      "enabled": ["codex", "gpt-idea", "claude-code", "claude-ide"]
+    },
+    {
+      "id": "using-git-worktrees",
+      "path": "skills/superpowers/using-git-worktrees",
+      "source": "codex-superpowers",
+      "enabled": ["codex", "gpt-idea", "claude-code", "claude-ide"]
+    },
+    {
+      "id": "using-superpowers",
+      "path": "skills/superpowers/using-superpowers",
+      "source": "codex-superpowers",
+      "enabled": ["codex", "gpt-idea", "claude-code", "claude-ide"]
+    },
+    {
+      "id": "verification-before-completion",
+      "path": "skills/superpowers/verification-before-completion",
+      "source": "codex-superpowers",
+      "enabled": ["codex", "gpt-idea", "claude-code", "claude-ide"]
+    },
+    {
+      "id": "writing-plans",
+      "path": "skills/superpowers/writing-plans",
+      "source": "codex-superpowers",
+      "enabled": ["codex", "gpt-idea", "claude-code", "claude-ide"]
+    },
+    {
+      "id": "writing-skills",
+      "path": "skills/superpowers/writing-skills",
+      "source": "codex-superpowers",
+      "enabled": ["codex", "gpt-idea", "claude-code", "claude-ide"]
+    },
+    {
+      "id": "iho-db-pgsql",
+      "path": "skills/iho-db-pgsql",
+      "source": "local",
+      "enabled": ["codex", "gpt-idea", "claude-code", "claude-ide"]
+    },
+    {
+      "id": "iho-java",
+      "path": "skills/iho-java",
+      "source": "local",
+      "enabled": ["codex", "gpt-idea", "claude-code", "claude-ide"]
+    },
+    {
+      "id": "spec",
+      "path": "skills/spec",
+      "source": "local",
+      "enabled": ["codex", "gpt-idea", "claude-code", "claude-ide"]
+    },
+    {
+      "id": "wangjie-defaults",
+      "path": "skills/wangjie-defaults",
+      "source": "local",
+      "enabled": ["codex", "gpt-idea", "claude-code", "claude-ide"]
+    }
+  ],
+  "agents": []
+}

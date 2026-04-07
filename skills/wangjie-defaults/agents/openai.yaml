@@ -1,0 +1,7 @@
+interface:
+  display_name: "Wangjie 默认规范"
+  short_description: "默认中文输出与 wangjie 协作规范"
+  default_prompt: "使用 $wangjie-defaults，以中文完成任务并遵循 wangjie 的默认协作规范。"
+
+policy:
+  allow_implicit_invocation: true

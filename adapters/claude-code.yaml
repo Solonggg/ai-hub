@@ -1,0 +1,10 @@
+{
+  "tool": "claude-code",
+  "output_dir": "dist/claude-code",
+  "skill_dir_name": "skills",
+  "agent_dir_name": "agents",
+  "bootstrap_file": "CLAUDE.md",
+  "bootstrap_source": "adapters/bootstrap/CLAUDE.md",
+  "preserve_skill_agents": true,
+  "flatten_global_agents": false
+}

@@ -1,0 +1,7 @@
+interface:
+  display_name: "IHO Java 规范"
+  short_description: "IHO Java、Spring Boot、MyBatis 与 Maven 多模块规范"
+  default_prompt: "使用 $iho-java，按 IHO Java 项目规范完成当前任务。"
+
+policy:
+  allow_implicit_invocation: true

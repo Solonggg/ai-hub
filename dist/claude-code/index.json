@@ -1,0 +1,107 @@
+{
+  "tool": "claude-code",
+  "output_dir": "dist/claude-code",
+  "skills": [
+    {
+      "id": "skill-creator",
+      "path": "skills/.system/skill-creator",
+      "source": "codex-system"
+    },
+    {
+      "id": "skill-installer",
+      "path": "skills/.system/skill-installer",
+      "source": "codex-system"
+    },
+    {
+      "id": "brainstorming",
+      "path": "skills/superpowers/brainstorming",
+      "source": "codex-superpowers"
+    },
+    {
+      "id": "dispatching-parallel-agents",
+      "path": "skills/superpowers/dispatching-parallel-agents",
+      "source": "codex-superpowers"
+    },
+    {
+      "id": "executing-plans",
+      "path": "skills/superpowers/executing-plans",
+      "source": "codex-superpowers"
+    },
+    {
+      "id": "finishing-a-development-branch",
+      "path": "skills/superpowers/finishing-a-development-branch",
+      "source": "codex-superpowers"
+    },
+    {
+      "id": "receiving-code-review",
+      "path": "skills/superpowers/receiving-code-review",
+      "source": "codex-superpowers"
+    },
+    {
+      "id": "requesting-code-review",
+      "path": "skills/superpowers/requesting-code-review",
+      "source": "codex-superpowers"
+    },
+    {
+      "id": "subagent-driven-development",
+      "path": "skills/superpowers/subagent-driven-development",
+      "source": "codex-superpowers"
+    },
+    {
+      "id": "systematic-debugging",
+      "path": "skills/superpowers/systematic-debugging",
+      "source": "codex-superpowers"
+    },
+    {
+      "id": "test-driven-development",
+      "path": "skills/superpowers/test-driven-development",
+      "source": "codex-superpowers"
+    },
+    {
+      "id": "using-git-worktrees",
+      "path": "skills/superpowers/using-git-worktrees",
+      "source": "codex-superpowers"
+    },
+    {
+      "id": "using-superpowers",
+      "path": "skills/superpowers/using-superpowers",
+      "source": "codex-superpowers"
+    },
+    {
+      "id": "verification-before-completion",
+      "path": "skills/superpowers/verification-before-completion",
+      "source": "codex-superpowers"
+    },
+    {
+      "id": "writing-plans",
+      "path": "skills/superpowers/writing-plans",
+      "source": "codex-superpowers"
+    },
+    {
+      "id": "writing-skills",
+      "path": "skills/superpowers/writing-skills",
+      "source": "codex-superpowers"
+    },
+    {
+      "id": "iho-db-pgsql",
+      "path": "skills/iho-db-pgsql",
+      "source": "local"
+    },
+    {
+      "id": "iho-java",
+      "path": "skills/iho-java",
+      "source": "local"
+    },
+    {
+      "id": "spec",
+      "path": "skills/spec",
+      "source": "local"
+    },
+    {
+      "id": "wangjie-defaults",
+      "path": "skills/wangjie-defaults",
+      "source": "local"
+    }
+  ],
+  "agents": []
+}

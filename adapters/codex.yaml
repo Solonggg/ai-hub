@@ -1,0 +1,10 @@
+{
+  "tool": "codex",
+  "output_dir": "dist/codex",
+  "skill_dir_name": "skills",
+  "agent_dir_name": "agents",
+  "bootstrap_file": "AGENTS.md",
+  "bootstrap_source": "adapters/bootstrap/AGENTS.md",
+  "preserve_skill_agents": true,
+  "flatten_global_agents": false
+}
