@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-UI/UX Pro Max Search - BM25 search engine for UI/UX style guides
+UI/UX Pro Max Search - 面向 UI/UX 指南数据集的检索工具
 Usage: python search.py "<query>" [--domain <domain>] [--stack <stack>] [--max-results 3]
        python search.py "<query>" --design-system [-p "Project Name"]
        python search.py "<query>" --design-system --persist [-p "Project Name"] [--page "dashboard"]
@@ -28,21 +28,23 @@ if sys.stderr.encoding and sys.stderr.encoding.lower() != 'utf-8':
 
 
 def format_output(result):
-    """Format results for Claude consumption (token-optimized)"""
+    """Format results for terminal reading."""
     if "error" in result:
-        return f"Error: {result['error']}"
+        return f"错误：{result['error']}"
 
     output = []
     if result.get("stack"):
-        output.append(f"## UI Pro Max Stack Guidelines")
-        output.append(f"**Stack:** {result['stack']} | **Query:** {result['query']}")
+        output.append("## UI/UX 栈规范检索结果")
+        output.append(f"**技术栈：** {result['stack']} | **原始查询：** {result['query']}")
     else:
-        output.append(f"## UI Pro Max Search Results")
-        output.append(f"**Domain:** {result['domain']} | **Query:** {result['query']}")
-    output.append(f"**Source:** {result['file']} | **Found:** {result['count']} results\n")
+        output.append("## UI/UX 检索结果")
+        output.append(f"**领域：** {result['domain']} | **原始查询：** {result['query']}")
+    if result.get("normalized_query") and result["normalized_query"] != result["query"]:
+        output.append(f"**归一化查询：** {result['normalized_query']}")
+    output.append(f"**数据源：** {result['file']} | **命中：** {result['count']} 条\n")
 
     for i, row in enumerate(result['results'], 1):
-        output.append(f"### Result {i}")
+        output.append(f"### 结果 {i}")
         for key, value in row.items():
             value_str = str(value)
             if len(value_str) > 300:
@@ -54,20 +56,20 @@ def format_output(result):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="UI Pro Max Search")
-    parser.add_argument("query", help="Search query")
-    parser.add_argument("--domain", "-d", choices=list(CSV_CONFIG.keys()), help="Search domain")
-    parser.add_argument("--stack", "-s", choices=AVAILABLE_STACKS, help="Stack-specific search (html-tailwind, react, nextjs)")
-    parser.add_argument("--max-results", "-n", type=int, default=MAX_RESULTS, help="Max results (default: 3)")
-    parser.add_argument("--json", action="store_true", help="Output as JSON")
+    parser = argparse.ArgumentParser(description="UI/UX 检索工具")
+    parser.add_argument("query", help="检索词，支持中文")
+    parser.add_argument("--domain", "-d", choices=list(CSV_CONFIG.keys()), help="检索领域")
+    parser.add_argument("--stack", "-s", choices=AVAILABLE_STACKS, help="按技术栈检索规范")
+    parser.add_argument("--max-results", "-n", type=int, default=MAX_RESULTS, help="最大返回条数，默认 3")
+    parser.add_argument("--json", action="store_true", help="以 JSON 输出")
     # Design system generation
-    parser.add_argument("--design-system", "-ds", action="store_true", help="Generate complete design system recommendation")
-    parser.add_argument("--project-name", "-p", type=str, default=None, help="Project name for design system output")
-    parser.add_argument("--format", "-f", choices=["ascii", "markdown"], default="ascii", help="Output format for design system")
+    parser.add_argument("--design-system", "-ds", action="store_true", help="生成完整设计系统建议")
+    parser.add_argument("--project-name", "-p", type=str, default=None, help="设计系统输出中的项目名")
+    parser.add_argument("--format", "-f", choices=["ascii", "markdown"], default="ascii", help="设计系统输出格式")
     # Persistence (Master + Overrides pattern)
-    parser.add_argument("--persist", action="store_true", help="Save design system to design-system/MASTER.md (creates hierarchical structure)")
-    parser.add_argument("--page", type=str, default=None, help="Create page-specific override file in design-system/pages/")
-    parser.add_argument("--output-dir", "-o", type=str, default=None, help="Output directory for persisted files (default: current directory)")
+    parser.add_argument("--persist", action="store_true", help="将设计系统保存到 design-system/ 目录")
+    parser.add_argument("--page", type=str, default=None, help="同时创建页面级覆盖文件")
+    parser.add_argument("--output-dir", "-o", type=str, default=None, help="持久化输出目录，默认当前目录")
 
     args = parser.parse_args()
 
@@ -87,14 +89,14 @@ if __name__ == "__main__":
         if args.persist:
             project_slug = args.project_name.lower().replace(' ', '-') if args.project_name else "default"
             print("\n" + "=" * 60)
-            print(f"✅ Design system persisted to design-system/{project_slug}/")
-            print(f"   📄 design-system/{project_slug}/MASTER.md (Global Source of Truth)")
+            print(f"✅ 设计系统已落盘到 design-system/{project_slug}/")
+            print(f"   📄 design-system/{project_slug}/MASTER.md（全局主规则）")
             if args.page:
                 page_filename = args.page.lower().replace(' ', '-')
-                print(f"   📄 design-system/{project_slug}/pages/{page_filename}.md (Page Overrides)")
+                print(f"   📄 design-system/{project_slug}/pages/{page_filename}.md（页面覆盖规则）")
             print("")
-            print(f"📖 Usage: When building a page, check design-system/{project_slug}/pages/[page].md first.")
-            print(f"   If exists, its rules override MASTER.md. Otherwise, use MASTER.md.")
+            print(f"📖 使用方式：开发页面时优先检查 design-system/{project_slug}/pages/[page].md。")
+            print("   页面文件存在时以页面规则覆盖 MASTER.md；否则直接遵循 MASTER.md。")
             print("=" * 60)
     # Stack search
     elif args.stack:

@@ -1,363 +1,141 @@
 ---
 name: ui-ux-pro-max
-description: UI/UX design intelligence with searchable database
+description: 在需要为中文产品、中文页面或面向中国用户的 Web/App 界面提供风格、配色、排版、交互、图表或组件建议时使用
 ---
 
 # ui-ux-pro-max
 
-Comprehensive design guide for web and mobile applications. Contains 67 styles, 161 color palettes, 57 font pairings, 99 UX guidelines, and 25 chart types across 16 technology stacks. Searchable database with priority-based recommendations.
+这是一个面向中文产品设计语境的 UI/UX 检索型 skill。它通过本地 CSV 数据和脚本，为你提供风格、配色、版式、交互、图表与移动端体验建议。
 
-# Prerequisites
+## 使用前提
 
-Check if Python is installed:
-
-```bash
-python3 --version || python --version
-```
-
-If Python is not installed, install it based on user's OS:
-
-**macOS:**
-```bash
-brew install python3
-```
-
-**Ubuntu/Debian:**
-```bash
-sudo apt update && sudo apt install python3
-```
-
-**Windows:**
-```powershell
-winget install Python.Python.3.12
-```
-
----
-
-## How to Use This Skill
-
-Use this skill when the user requests any of the following:
-
-| Scenario | Trigger Examples | Start From |
-|----------|-----------------|------------|
-| **New project / page** | "做一个 landing page"、"Build a dashboard" | Step 1 → Step 2 (design system) |
-| **New component** | "Create a pricing card"、"Add a modal" | Step 3 (domain search: style, ux) |
-| **Choose style / color / font** | "What style fits a fintech app?"、"推荐配色" | Step 2 (design system) |
-| **Review existing UI** | "Review this page for UX issues"、"检查无障碍" | Quick Reference checklist above |
-| **Fix a UI bug** | "Button hover is broken"、"Layout shifts on load" | Quick Reference → relevant section |
-| **Improve / optimize** | "Make this faster"、"Improve mobile experience" | Step 3 (domain search: ux, react) |
-| **Implement dark mode** | "Add dark mode support" | Step 3 (domain: style "dark mode") |
-| **Add charts / data viz** | "Add an analytics dashboard chart" | Step 3 (domain: chart) |
-| **Stack best practices** | "React performance tips"、"SwiftUI navigation" | Step 4 (stack search) |
-
-Follow this workflow:
-
-### Step 1: Analyze User Requirements
-
-Extract key information from user request:
-- **Product type**: Entertainment (social, video, music, gaming), Tool (scanner, editor, converter), Productivity (task manager, notes, calendar), or hybrid
-- **Target audience**: C-end consumer users; consider age group, usage context (commute, leisure, work)
-- **Style keywords**: playful, vibrant, minimal, dark mode, content-first, immersive, etc.
-- **Stack**: React Native (this project's only tech stack)
-
-### Step 2: Generate Design System (REQUIRED)
-
-**Always start with `--design-system`** to get comprehensive recommendations with reasoning:
+确认本机可用 `python3`：
 
 ```bash
-python3 /Users/wangjie/ai-hub/skills/ui-ux-pro-max/scripts/search.py "<product_type> <industry> <keywords>" --design-system [-p "Project Name"]
+python3 --version
 ```
 
-This command:
-1. Searches domains in parallel (product, style, color, landing, typography)
-2. Applies reasoning rules from `ui-reasoning.csv` to select best matches
-3. Returns complete design system: pattern, style, colors, typography, effects
-4. Includes anti-patterns to avoid
+## 何时使用
 
-**Example:**
-```bash
-python3 /Users/wangjie/ai-hub/skills/ui-ux-pro-max/scripts/search.py "beauty spa wellness service" --design-system -p "Serenity Spa"
-```
+用户出现以下需求时启用本 skill：
 
-### Step 2b: Persist Design System (Master + Overrides Pattern)
+- 新做一个中文站点、App 页面、后台或小程序页面
+- 想确定风格、配色、排版、图标或图表方案
+- 想评审现有 UI 的体验、无障碍、层级或视觉质量
+- 想为某个具体页面补充结构建议，例如首页、登录页、详情页、支付页、仪表盘
 
-To save the design system for **hierarchical retrieval across sessions**, add `--persist`:
+## 核心原则
 
-```bash
-python3 /Users/wangjie/ai-hub/skills/ui-ux-pro-max/scripts/search.py "<query>" --design-system --persist -p "Project Name"
-```
+- 默认优先中文语义：查询词可以直接写中文，脚本会自动扩展常见中英关键词。
+- 默认优先中文可读性：中文界面优先使用支持中文的字体方案，不直接照搬只适合西文的字体组合。
+- 先出设计系统，再补局部细节：除非用户只问一个很窄的问题，否则先跑 `--design-system`。
+- 保留业务语气：医疗、金融、政务、教育等场景优先考虑信任感、可读性和信息层级，而不是单纯追求“酷”。
 
-This creates:
-- `design-system/MASTER.md` — Global Source of Truth with all design rules
-- `design-system/pages/` — Folder for page-specific overrides
+## 标准工作流
 
-**With page-specific override:**
-```bash
-python3 /Users/wangjie/ai-hub/skills/ui-ux-pro-max/scripts/search.py "<query>" --design-system --persist -p "Project Name" --page "dashboard"
-```
+### 1. 先判断产品语境
 
-This also creates:
-- `design-system/pages/dashboard.md` — Page-specific deviations from Master
+从用户请求里提取四类信息：
 
-**How hierarchical retrieval works:**
-1. When building a specific page (e.g., "Checkout"), first check `design-system/pages/checkout.md`
-2. If the page file exists, its rules **override** the Master file
-3. If not, use `design-system/MASTER.md` exclusively
+- 产品类型：如医疗、教育、电商、内容社区、企业服务、工具、后台
+- 用户类型：如大众消费者、专业用户、运营人员、销售、医生、学生
+- 风格关键词：如极简、科技感、高级感、年轻化、玻璃拟态、深色模式
+- 终端形态：Web、移动端、App、小程序、后台大屏
 
-**Context-aware retrieval prompt:**
-```
-I am building the [Page Name] page. Please read design-system/MASTER.md.
-Also check if design-system/pages/[page-name].md exists.
-If the page file exists, prioritize its rules.
-If not, use the Master rules exclusively.
-Now, generate the code...
-```
-
-### Step 3: Supplement with Detailed Searches (as needed)
-
-After getting the design system, use domain searches to get additional details:
+### 2. 必须先生成设计系统
 
 ```bash
-python3 /Users/wangjie/ai-hub/skills/ui-ux-pro-max/scripts/search.py "<keyword>" --domain <domain> [-n <max_results>]
+python3 /ui-ux-pro-max/scripts/search.py "<中文查询>" --design-system -p "<项目名>"
 ```
 
-**When to use detailed searches:**
-
-| Need | Domain | Example |
-|------|--------|---------|
-| Product type patterns | `product` | `--domain product "entertainment social"` |
-| More style options | `style` | `--domain style "glassmorphism dark"` |
-| Color palettes | `color` | `--domain color "entertainment vibrant"` |
-| Font pairings | `typography` | `--domain typography "playful modern"` |
-| Chart recommendations | `chart` | `--domain chart "real-time dashboard"` |
-| UX best practices | `ux` | `--domain ux "animation accessibility"` |
-| Landing structure | `landing` | `--domain landing "hero social-proof"` |
-| React Native perf | `react` | `--domain react "rerender memo list"` |
-| App interface a11y | `web` | `--domain web "accessibilityLabel touch safe-areas"` |
-| AI prompt / CSS keywords | `prompt` | `--domain prompt "minimalism"` |
-
-### Step 4: Stack Guidelines (React Native)
-
-Get React Native implementation-specific best practices:
+推荐中文示例：
 
 ```bash
-python3 /Users/wangjie/ai-hub/skills/ui-ux-pro-max/scripts/search.py "<keyword>" --stack react-native
+python3 /ui-ux-pro-max/scripts/search.py "医疗健康应用 极简 可信" --design-system -p "问诊助手"
+python3 /ui-ux-pro-max/scripts/search.py "电商首页 年轻化 高转化" --design-system -p "潮流商城"
+python3 /ui-ux-pro-max/scripts/search.py "企业服务后台 高密度 清晰" --design-system -p "运营后台"
 ```
 
----
+这个命令会同时聚合：
 
-## Search Reference
+- 产品类型建议
+- 风格建议
+- 配色建议
+- 页面结构建议
+- 排版建议
+- 反模式与交付前检查项
 
-### Available Domains
-
-| Domain | Use For | Example Keywords |
-|--------|---------|------------------|
-| `product` | Product type recommendations | SaaS, e-commerce, portfolio, healthcare, beauty, service |
-| `style` | UI styles, colors, effects | glassmorphism, minimalism, dark mode, brutalism |
-| `typography` | Font pairings, Google Fonts | elegant, playful, professional, modern |
-| `color` | Color palettes by product type | saas, ecommerce, healthcare, beauty, fintech, service |
-| `landing` | Page structure, CTA strategies | hero, hero-centric, testimonial, pricing, social-proof |
-| `chart` | Chart types, library recommendations | trend, comparison, timeline, funnel, pie |
-| `ux` | Best practices, anti-patterns | animation, accessibility, z-index, loading |
-| `react` | React/Next.js performance | waterfall, bundle, suspense, memo, rerender, cache |
-| `web` | App interface guidelines (iOS/Android/React Native) | accessibilityLabel, touch targets, safe areas, Dynamic Type |
-| `prompt` | AI prompts, CSS keywords | (style name) |
-
-### Available Stacks
-
-| Stack | Focus |
-|-------|-------|
-| `react-native` | Components, Navigation, Lists |
-
----
-
-## Example Workflow
-
-**User request:** "Make an AI search homepage。"
-
-### Step 1: Analyze Requirements
-- Product type: Tool (AI search engine)
-- Target audience: C-end users looking for fast, intelligent search
-- Style keywords: modern, minimal, content-first, dark mode
-- Stack: React Native
-
-### Step 2: Generate Design System (REQUIRED)
+### 3. 只在需要时补局部检索
 
 ```bash
-python3 /Users/wangjie/ai-hub/skills/ui-ux-pro-max/scripts/search.py "AI search tool modern minimal" --design-system -p "AI Search"
+python3 /ui-ux-pro-max/scripts/search.py "<中文查询>" --domain <domain>
 ```
 
-**Output:** Complete design system with pattern, style, colors, typography, effects, and anti-patterns.
+常用领域：
 
-### Step 3: Supplement with Detailed Searches (as needed)
+- `product`：产品类型和推荐风格
+- `style`：视觉风格、质感、动效
+- `color`：语义配色
+- `typography`：排版气质
+- `landing`：落地页结构、CTA 位置
+- `chart`：图表类型
+- `ux`：交互与无障碍建议
+- `react`：React/Next 性能与体验建议
+- `web`：移动端界面、表单、可访问性
+
+示例：
 
 ```bash
-# Get style options for a modern tool product
-python3 /Users/wangjie/ai-hub/skills/ui-ux-pro-max/scripts/search.py "minimalism dark mode" --domain style
-
-# Get UX best practices for search interaction and loading
-python3 /Users/wangjie/ai-hub/skills/ui-ux-pro-max/scripts/search.py "search loading animation" --domain ux
+python3 /ui-ux-pro-max/scripts/search.py "搜索页 加载 骨架屏" --domain ux
+python3 /ui-ux-pro-max/scripts/search.py "金融产品 配色 稳重" --domain color
+python3 /ui-ux-pro-max/scripts/search.py "后台 仪表盘 图表" --domain chart
 ```
 
-### Step 4: Stack Guidelines
+### 4. 需要落盘时使用持久化
 
 ```bash
-python3 /Users/wangjie/ai-hub/skills/ui-ux-pro-max/scripts/search.py "list performance navigation" --stack react-native
+python3 /ui-ux-pro-max/scripts/search.py "<中文查询>" --design-system --persist -p "<项目名>" --page "<页面名>"
 ```
 
-**Then:** Synthesize design system + detailed searches and implement the design.
+它会生成：
 
----
+- `design-system/<project>/MASTER.md`：全局设计主规则
+- `design-system/<project>/pages/<page>.md`：页面级覆盖规则
 
-## Output Formats
+使用顺序：
 
-The `--design-system` flag supports two output formats:
+1. 先看页面级规则
+2. 页面规则存在时覆盖主规则
+3. 页面规则不存在时完全遵循 `MASTER.md`
+
+## 中文查询策略
+
+- 直接用中文写需求，不需要先翻译成英文。
+- 查询词至少包含 `产品类型 + 风格/目标 + 页面/终端形态` 三部分。
+- 如果第一次结果偏泛，补充业务语气词，例如：`可信`、`高转化`、`高密度`、`内容优先`、`年轻化`、`高级感`。
+- 如果是中国常见业务形态，优先显式写出：`小程序`、`后台`、`详情页`、`支付页`、`内容社区`、`问诊`、`预约`、`直播`。
+
+## 字体与中文界面约束
+
+- 中文项目默认优先使用支持中文的字体方案，例如 `Noto Sans SC`、`Noto Serif SC`。
+- 如果数据集返回的是西文字体组合，只借鉴其气质、层级和字重关系，不直接原样照搬。
+- 信息密度高的页面，优先考虑字重层级、行高和留白，而不是复杂装饰。
+
+## 交付前最低检查
+
+- 所有可点击元素都有清晰状态反馈
+- 浅色与深色模式都单独校验对比度
+- 图标不用表情符号替代
+- 375px 移动端宽度下不炸布局
+- 固定头部、底部按钮和弹层不会遮挡主要内容
+- 表单错误、加载状态、空状态都明确可见
+
+## 输出格式
 
 ```bash
-# ASCII box (default) - best for terminal display
-python3 /Users/wangjie/ai-hub/skills/ui-ux-pro-max/scripts/search.py "fintech crypto" --design-system
+# 终端盒状输出
+python3 /ui-ux-pro-max/scripts/search.py "企业服务后台 高密度" --design-system
 
-# Markdown - best for documentation
-python3 /Users/wangjie/ai-hub/skills/ui-ux-pro-max/scripts/search.py "fintech crypto" --design-system -f markdown
+# Markdown 输出，适合写文档
+python3 /ui-ux-pro-max/scripts/search.py "企业服务后台 高密度" --design-system -f markdown
 ```
-
----
-
-## Tips for Better Results
-
-### Query Strategy
-
-- Use **multi-dimensional keywords** — combine product + industry + tone + density: `"entertainment social vibrant content-dense"` not just `"app"`
-- Try different keywords for the same need: `"playful neon"` → `"vibrant dark"` → `"content-first minimal"`
-- Use `--design-system` first for full recommendations, then `--domain` to deep-dive any dimension you're unsure about
-- Always add `--stack react-native` for implementation-specific guidance
-
-### Common Sticking Points
-
-| Problem | What to Do |
-|---------|------------|
-| Can't decide on style/color | Re-run `--design-system` with different keywords |
-| Dark mode contrast issues | Quick Reference §6: `color-dark-mode` + `color-accessible-pairs` |
-| Animations feel unnatural | Quick Reference §7: `spring-physics` + `easing` + `exit-faster-than-enter` |
-| Form UX is poor | Quick Reference §8: `inline-validation` + `error-clarity` + `focus-management` |
-| Navigation feels confusing | Quick Reference §9: `nav-hierarchy` + `bottom-nav-limit` + `back-behavior` |
-| Layout breaks on small screens | Quick Reference §5: `mobile-first` + `breakpoint-consistency` |
-| Performance / jank | Quick Reference §3: `virtualize-lists` + `main-thread-budget` + `debounce-throttle` |
-
-### Pre-Delivery Checklist
-
-- Run `--domain ux "animation accessibility z-index loading"` as a UX validation pass before implementation
-- Run through Quick Reference **§1–§3** (CRITICAL + HIGH) as a final review
-- Test on 375px (small phone) and landscape orientation
-- Verify behavior with **reduced-motion** enabled and **Dynamic Type** at largest size
-- Check dark mode contrast independently (don't assume light mode values work)
-- Confirm all touch targets ≥44pt and no content hidden behind safe areas
-
----
-
-## Common Rules for Professional UI
-
-These are frequently overlooked issues that make UI look unprofessional:
-Scope notice: The rules below are for App UI (iOS/Android/React Native/Flutter), not desktop-web interaction patterns.
-
-### Icons & Visual Elements
-
-- 默认图标库使用 **Phosphor (`@phosphor-icons/react`)**。`/Users/wangjie/ai-hub/skills/ui-ux-pro-max/data/icons.csv` 中列出的只是常用推荐图标，不是完整集合。
-- 当推荐表中找不到合适的图标时：
-  - **优先继续从 Phosphor 的完整图标集中选择任何语义更贴切的图标**；
-  - 如果 Phosphor 也没有理想选项，可以使用 **Heroicons (`@heroicons/react`)** 作为备选，注意保持风格一致（线性/填充、笔画粗细、圆角风格）。
-
-| Rule | Standard | Avoid | Why It Matters |
-|------|----------|--------|----------------|
-| **No Emoji as Structural Icons** | Use vector-based icons (e.g., Phosphor `@phosphor-icons/react`, Heroicons `@heroicons/react`, react-native-vector-icons, @expo/vector-icons). | Using emojis (🎨 🚀 ⚙️) for navigation, settings, or system controls. | Emojis are font-dependent, inconsistent across platforms, and cannot be controlled via design tokens. |
-| **Vector-Only Assets** | Use SVG or platform vector icons that scale cleanly and support theming. | Raster PNG icons that blur or pixelate. | Ensures scalability, crisp rendering, and dark/light mode adaptability. |
-| **Stable Interaction States** | Use color, opacity, or elevation transitions for press states without changing layout bounds. | Layout-shifting transforms that move surrounding content or trigger visual jitter. | Prevents unstable interactions and preserves smooth motion/perceived quality on mobile. |
-| **Correct Brand Logos** | Use official brand assets and follow their usage guidelines (spacing, color, clear space). | Guessing logo paths, recoloring unofficially, or modifying proportions. | Prevents brand misuse and ensures legal/platform compliance. |
-| **Consistent Icon Sizing** | Define icon sizes as design tokens (e.g., icon-sm, icon-md = 24pt, icon-lg). | Mixing arbitrary values like 20pt / 24pt / 28pt randomly. | Maintains rhythm and visual hierarchy across the interface. |
-| **Stroke Consistency** | Use a consistent stroke width within the same visual layer (e.g., 1.5px or 2px). | Mixing thick and thin stroke styles arbitrarily. | Inconsistent strokes reduce perceived polish and cohesion. |
-| **Filled vs Outline Discipline** | Use one icon style per hierarchy level. | Mixing filled and outline icons at the same hierarchy level. | Maintains semantic clarity and stylistic coherence. |
-| **Touch Target Minimum** | Minimum 44×44pt interactive area (use hitSlop if icon is smaller). | Small icons without expanded tap area. | Meets accessibility and platform usability standards. |
-| **Icon Alignment** | Align icons to text baseline and maintain consistent padding. | Misaligned icons or inconsistent spacing around them. | Prevents subtle visual imbalance that reduces perceived quality. |
-| **Icon Contrast** | Follow WCAG contrast standards: 4.5:1 for small elements, 3:1 minimum for larger UI glyphs. | Low-contrast icons that blend into the background. | Ensures accessibility in both light and dark modes. |
-
-
-### Interaction (App)
-
-| Rule | Do | Don't |
-|------|----|----- |
-| **Tap feedback** | Provide clear pressed feedback (ripple/opacity/elevation) within 80-150ms | No visual response on tap |
-| **Animation timing** | Keep micro-interactions around 150-300ms with platform-native easing | Instant transitions or slow animations (>500ms) |
-| **Accessibility focus** | Ensure screen reader focus order matches visual order and labels are descriptive | Unlabeled controls or confusing focus traversal |
-| **Disabled state clarity** | Use disabled semantics (`disabled`/native disabled props), reduced emphasis, and no tap action | Controls that look tappable but do nothing |
-| **Touch target minimum** | Keep tap areas >=44x44pt (iOS) or >=48x48dp (Android), expand hit area when icon is smaller | Tiny tap targets or icon-only hit areas without padding |
-| **Gesture conflict prevention** | Keep one primary gesture per region and avoid nested tap/drag conflicts | Overlapping gestures causing accidental actions |
-| **Semantic native controls** | Prefer native interactive primitives (`Button`, `Pressable`, platform equivalents) with proper accessibility roles | Generic containers used as primary controls without semantics |
-
-### Light/Dark Mode Contrast
-
-| Rule | Do | Don't |
-|------|----|----- |
-| **Surface readability (light)** | Keep cards/surfaces clearly separated from background with sufficient opacity/elevation | Overly transparent surfaces that blur hierarchy |
-| **Text contrast (light)** | Maintain body text contrast >=4.5:1 against light surfaces | Low-contrast gray body text |
-| **Text contrast (dark)** | Maintain primary text contrast >=4.5:1 and secondary text >=3:1 on dark surfaces | Dark mode text that blends into background |
-| **Border and divider visibility** | Ensure separators are visible in both themes (not just light mode) | Theme-specific borders disappearing in one mode |
-| **State contrast parity** | Keep pressed/focused/disabled states equally distinguishable in light and dark themes | Defining interaction states for one theme only |
-| **Token-driven theming** | Use semantic color tokens mapped per theme across app surfaces/text/icons | Hardcoded per-screen hex values |
-| **Scrim and modal legibility** | Use a modal scrim strong enough to isolate foreground content (typically 40-60% black) | Weak scrim that leaves background visually competing |
-
-### Layout & Spacing
-
-| Rule | Do | Don't |
-|------|----|----- |
-| **Safe-area compliance** | Respect top/bottom safe areas for all fixed headers, tab bars, and CTA bars | Placing fixed UI under notch, status bar, or gesture area |
-| **System bar clearance** | Add spacing for status/navigation bars and gesture home indicator | Let tappable content collide with OS chrome |
-| **Consistent content width** | Keep predictable content width per device class (phone/tablet) | Mixing arbitrary widths between screens |
-| **8dp spacing rhythm** | Use a consistent 4/8dp spacing system for padding/gaps/section spacing | Random spacing increments with no rhythm |
-| **Readable text measure** | Keep long-form text readable on large devices (avoid edge-to-edge paragraphs on tablets) | Full-width long text that hurts readability |
-| **Section spacing hierarchy** | Define clear vertical rhythm tiers (e.g., 16/24/32/48) by hierarchy | Similar UI levels with inconsistent spacing |
-| **Adaptive gutters by breakpoint** | Increase horizontal insets on larger widths and in landscape | Same narrow gutter on all device sizes/orientations |
-| **Scroll and fixed element coexistence** | Add bottom/top content insets so lists are not hidden behind fixed bars | Scroll content obscured by sticky headers/footers |
-
----
-
-## Pre-Delivery Checklist
-
-Before delivering UI code, verify these items:
-Scope notice: This checklist is for App UI (iOS/Android/React Native/Flutter).
-
-### Visual Quality
-- [ ] No emojis used as icons (use SVG instead)
-- [ ] All icons come from a consistent icon family and style
-- [ ] Official brand assets are used with correct proportions and clear space
-- [ ] Pressed-state visuals do not shift layout bounds or cause jitter
-- [ ] Semantic theme tokens are used consistently (no ad-hoc per-screen hardcoded colors)
-
-### Interaction
-- [ ] All tappable elements provide clear pressed feedback (ripple/opacity/elevation)
-- [ ] Touch targets meet minimum size (>=44x44pt iOS, >=48x48dp Android)
-- [ ] Micro-interaction timing stays in the 150-300ms range with native-feeling easing
-- [ ] Disabled states are visually clear and non-interactive
-- [ ] Screen reader focus order matches visual order, and interactive labels are descriptive
-- [ ] Gesture regions avoid nested/conflicting interactions (tap/drag/back-swipe conflicts)
-
-### Light/Dark Mode
-- [ ] Primary text contrast >=4.5:1 in both light and dark mode
-- [ ] Secondary text contrast >=3:1 in both light and dark mode
-- [ ] Dividers/borders and interaction states are distinguishable in both modes
-- [ ] Modal/drawer scrim opacity is strong enough to preserve foreground legibility (typically 40-60% black)
-- [ ] Both themes are tested before delivery (not inferred from a single theme)
-
-### Layout
-- [ ] Safe areas are respected for headers, tab bars, and bottom CTA bars
-- [ ] Scroll content is not hidden behind fixed/sticky bars
-- [ ] Verified on small phone, large phone, and tablet (portrait + landscape)
-- [ ] Horizontal insets/gutters adapt correctly by device size and orientation
-- [ ] 4/8dp spacing rhythm is maintained across component, section, and page levels
-- [ ] Long-form text measure remains readable on larger devices (no edge-to-edge paragraphs)
-
-### Accessibility
-- [ ] All meaningful images/icons have accessibility labels
-- [ ] Form fields have labels, hints, and clear error messages
-- [ ] Color is not the only indicator
-- [ ] Reduced motion and dynamic text size are supported without layout breakage
-- [ ] Accessibility traits/roles/states (selected, disabled, expanded) are announced correctly

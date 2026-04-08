@@ -84,6 +84,131 @@ _STACK_COLS = {
 
 AVAILABLE_STACKS = list(STACK_CONFIG.keys())
 
+CJK_RE = re.compile(r'[\u3400-\u9fff]')
+CJK_BLOCK_RE = re.compile(r'[\u3400-\u9fff]+')
+
+# Longest phrases should come first to avoid shorter aliases swallowing intent.
+QUERY_ALIASES = [
+    ("数据大屏", ["dashboard", "analytics", "monitoring", "data panel"]),
+    ("数据看板", ["dashboard", "analytics", "monitoring"]),
+    ("仪表盘", ["dashboard", "analytics", "panel"]),
+    ("管理后台", ["admin", "dashboard", "management"]),
+    ("后台", ["admin", "dashboard", "management"]),
+    ("落地页", ["landing page", "hero", "conversion", "cta"]),
+    ("官网", ["landing page", "homepage", "marketing website"]),
+    ("首页", ["homepage", "landing", "hero"]),
+    ("详情页", ["product detail", "detail page"]),
+    ("列表页", ["list", "catalog", "results"]),
+    ("小程序", ["mini program", "wechat", "mobile app"]),
+    ("小红书", ["social media", "content", "community", "creator economy"]),
+    ("直播", ["streaming", "live", "media"]),
+    ("短视频", ["video", "streaming", "social media"]),
+    ("社区", ["community", "social", "content"]),
+    ("社交", ["social", "community", "sharing"]),
+    ("内容", ["content", "media", "creator"]),
+    ("电商", ["ecommerce", "retail", "shop", "store"]),
+    ("商城", ["ecommerce", "retail", "shop", "store"]),
+    ("医疗", ["medical", "healthcare", "clinic", "patient"]),
+    ("问诊", ["medical", "healthcare", "consultation", "patient"]),
+    ("健康", ["health", "healthcare", "wellness"]),
+    ("教育", ["education", "learning", "training", "school"]),
+    ("课程", ["education", "learning", "course"]),
+    ("金融", ["finance", "fintech", "banking", "payment"]),
+    ("支付", ["payment", "finance", "checkout"]),
+    ("政务", ["government", "public service", "accessible"]),
+    ("餐饮", ["restaurant", "food service", "booking"]),
+    ("外卖", ["delivery", "food", "order"]),
+    ("旅游", ["travel", "tourism", "booking"]),
+    ("酒店", ["hotel", "hospitality", "booking"]),
+    ("房产", ["real estate", "property", "housing"]),
+    ("家装", ["home", "service", "lifestyle"]),
+    ("汽车", ["automotive", "vehicle", "dashboard"]),
+    ("工具", ["tool", "utility", "productivity"]),
+    ("效率", ["productivity", "workflow", "tool"]),
+    ("办公", ["productivity", "workflow", "collaboration"]),
+    ("企业服务", ["b2b service", "enterprise", "saas"]),
+    ("客服", ["support", "service", "chat"]),
+    ("知识库", ["knowledge base", "documentation", "search"]),
+    ("AI", ["ai", "artificial intelligence", "chatbot", "assistant"]),
+    ("搜索", ["search", "results", "query"]),
+    ("聊天", ["chat", "messenger", "conversation"]),
+    ("注册", ["signup", "register", "authentication"]),
+    ("登录", ["login", "signin", "authentication"]),
+    ("结账", ["checkout", "payment", "cart"]),
+    ("下单", ["checkout", "order", "payment"]),
+    ("表单", ["form", "validation", "input"]),
+    ("图表", ["chart", "graph", "visualization"]),
+    ("配色", ["color", "palette", "semantic color"]),
+    ("颜色", ["color", "palette"]),
+    ("字体", ["font", "typography", "typeface"]),
+    ("字体系", ["typography", "font pairing"]),
+    ("图标", ["icon", "svg icon", "symbol"]),
+    ("无障碍", ["accessibility", "wcag", "a11y"]),
+    ("可访问性", ["accessibility", "wcag", "a11y"]),
+    ("动效", ["animation", "motion", "micro interaction"]),
+    ("交互", ["ux", "interaction", "usability"]),
+    ("加载", ["loading", "skeleton", "progress"]),
+    ("转化", ["conversion", "cta", "landing"]),
+    ("极简", ["minimal", "minimalism", "clean"]),
+    ("简约", ["minimal", "minimalism", "clean"]),
+    ("高级感", ["luxury", "premium", "elegant"]),
+    ("科技感", ["futuristic", "tech", "modern"]),
+    ("年轻化", ["playful", "vibrant", "gen z"]),
+    ("国潮", ["brand", "editorial", "bold", "premium"]),
+    ("玻璃拟态", ["glassmorphism", "frosted glass", "blur"]),
+    ("新拟态", ["neumorphism", "soft ui"]),
+    ("粗野主义", ["brutalism", "bold", "raw"]),
+    ("新粗野", ["neubrutalism", "bold", "playful"]),
+    ("深色模式", ["dark mode", "oled"]),
+    ("暗黑", ["dark mode", "oled"]),
+    ("明亮", ["light mode", "bright"]),
+    ("高密度", ["data dense", "dense", "dashboard"]),
+]
+
+
+def _contains_cjk(text):
+    return bool(CJK_RE.search(str(text)))
+
+
+def _cjk_ngrams(text, min_n=2, max_n=3):
+    grams = []
+    cleaned = "".join(CJK_BLOCK_RE.findall(str(text)))
+    for n in range(min_n, max_n + 1):
+        if len(cleaned) < n:
+            continue
+        for idx in range(len(cleaned) - n + 1):
+            grams.append(cleaned[idx:idx + n])
+    return grams
+
+
+def normalize_query(query):
+    """Expand Chinese intent into English search aliases while preserving the original query."""
+    raw_query = str(query).strip()
+    lowered = raw_query.lower()
+    expanded_parts = [raw_query]
+
+    for phrase, aliases in QUERY_ALIASES:
+        if phrase in raw_query or phrase.lower() in lowered:
+            expanded_parts.extend(aliases)
+
+    expanded_parts.extend(re.findall(r'[a-z0-9][a-z0-9+#./-]*', lowered))
+
+    if _contains_cjk(raw_query):
+        for chunk in CJK_BLOCK_RE.findall(raw_query):
+            expanded_parts.append(chunk)
+            expanded_parts.extend(_cjk_ngrams(chunk))
+
+    deduped = []
+    seen = set()
+    for part in expanded_parts:
+        for token in str(part).split():
+            token = token.strip()
+            if token and token not in seen:
+                seen.add(token)
+                deduped.append(token)
+
+    return " ".join(deduped)
+
 
 # ============ BM25 IMPLEMENTATION ============
 class BM25:
@@ -100,9 +225,17 @@ class BM25:
         self.N = 0
 
     def tokenize(self, text):
-        """Lowercase, split, remove punctuation, filter short words"""
-        text = re.sub(r'[^\w\s]', ' ', str(text).lower())
-        return [w for w in text.split() if len(w) > 2]
+        """Tokenize Latin text and CJK text for mixed-language search."""
+        text = str(text).lower()
+        ascii_text = re.sub(r'[^a-z0-9+#./\-\s]', ' ', text)
+        ascii_tokens = [w for w in ascii_text.split() if len(w) > 1]
+
+        cjk_tokens = []
+        for chunk in CJK_BLOCK_RE.findall(text):
+            cjk_tokens.append(chunk)
+            cjk_tokens.extend(_cjk_ngrams(chunk))
+
+        return ascii_tokens + cjk_tokens
 
     def fit(self, documents):
         """Build BM25 index from documents"""
@@ -182,7 +315,7 @@ def _search_csv(filepath, search_cols, output_cols, query, max_results):
 
 def detect_domain(query):
     """Auto-detect the most relevant domain from query"""
-    query_lower = query.lower()
+    query_lower = normalize_query(query).lower()
 
     domain_keywords = {
         "color": ["color", "palette", "hex", "#", "rgb", "token", "semantic", "accent", "destructive", "muted", "foreground"],
@@ -205,8 +338,10 @@ def detect_domain(query):
 
 def search(query, domain=None, max_results=MAX_RESULTS):
     """Main search function with auto-domain detection"""
+    normalized_query = normalize_query(query)
+
     if domain is None:
-        domain = detect_domain(query)
+        domain = detect_domain(normalized_query)
 
     config = CSV_CONFIG.get(domain, CSV_CONFIG["style"])
     filepath = DATA_DIR / config["file"]
@@ -214,11 +349,12 @@ def search(query, domain=None, max_results=MAX_RESULTS):
     if not filepath.exists():
         return {"error": f"File not found: {filepath}", "domain": domain}
 
-    results = _search_csv(filepath, config["search_cols"], config["output_cols"], query, max_results)
+    results = _search_csv(filepath, config["search_cols"], config["output_cols"], normalized_query, max_results)
 
     return {
         "domain": domain,
         "query": query,
+        "normalized_query": normalized_query,
         "file": config["file"],
         "count": len(results),
         "results": results
@@ -235,12 +371,14 @@ def search_stack(query, stack, max_results=MAX_RESULTS):
     if not filepath.exists():
         return {"error": f"Stack file not found: {filepath}", "stack": stack}
 
-    results = _search_csv(filepath, _STACK_COLS["search_cols"], _STACK_COLS["output_cols"], query, max_results)
+    normalized_query = normalize_query(query)
+    results = _search_csv(filepath, _STACK_COLS["search_cols"], _STACK_COLS["output_cols"], normalized_query, max_results)
 
     return {
         "domain": "stack",
         "stack": stack,
         "query": query,
+        "normalized_query": normalized_query,
         "file": STACK_CONFIG[stack]["file"],
         "count": len(results),
         "results": results

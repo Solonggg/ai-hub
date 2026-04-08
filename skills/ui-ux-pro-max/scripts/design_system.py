@@ -16,9 +16,11 @@ Usage:
 import csv
 import json
 import os
+import re
+import unicodedata
 from datetime import datetime
 from pathlib import Path
-from core import search, DATA_DIR
+from core import search, DATA_DIR, normalize_query
 
 
 # ============ CONFIGURATION ============
@@ -31,6 +33,8 @@ SEARCH_CONFIG = {
     "landing": {"max_results": 2},
     "typography": {"max_results": 2}
 }
+
+CJK_RE = re.compile(r'[\u3400-\u9fff]')
 
 
 # ============ DESIGN SYSTEM GENERATOR ============
@@ -160,6 +164,35 @@ class DesignSystemGenerator:
         """Extract results list from search result dict."""
         return search_result.get("results", [])
 
+    def _is_chinese_context(self, query: str, project_name: str = None) -> bool:
+        return bool(CJK_RE.search(f"{query} {project_name or ''}"))
+
+    def _localize_typography_for_chinese(self, typography: dict, query: str, category: str, style_name: str) -> dict:
+        localized = dict(typography or {})
+        context = normalize_query(f"{query} {category} {style_name}").lower()
+        elegant_signals = ("luxury", "premium", "elegant", "wedding", "hotel", "beauty", "brand", "editorial")
+        heading_font = "Noto Serif SC" if any(signal in context for signal in elegant_signals) else "Noto Sans SC"
+
+        localized["Heading Font"] = heading_font
+        localized["Body Font"] = "Noto Sans SC"
+        localized["Mood/Style Keywords"] = localized.get(
+            "Mood/Style Keywords",
+            "中文界面优先保证字重层级、长文本可读性与移动端稳定显示"
+        )
+        localized["Best For"] = localized.get(
+            "Best For",
+            "中文产品界面、内容型页面、信息密度较高的业务页面"
+        )
+        localized["Google Fonts URL"] = (
+            "https://fonts.google.com/?query=Noto%20Sans%20SC%20Noto%20Serif%20SC"
+        )
+        localized["CSS Import"] = (
+            "@import url('https://fonts.googleapis.com/css2?"
+            "family=Noto+Sans+SC:wght@400;500;600;700;800&"
+            "family=Noto+Serif+SC:wght@500;600;700&display=swap');"
+        )
+        return localized
+
     def generate(self, query: str, project_name: str = None) -> dict:
         """Generate complete design system recommendation."""
         # Step 1: First search product to get category
@@ -187,6 +220,11 @@ class DesignSystemGenerator:
         best_color = color_results[0] if color_results else {}
         best_typography = typography_results[0] if typography_results else {}
         best_landing = landing_results[0] if landing_results else {}
+
+        if self._is_chinese_context(query, project_name):
+            best_typography = self._localize_typography_for_chinese(
+                best_typography, query, category, best_style.get("Style Category", "")
+            )
 
         # Step 5: Build final recommendation
         # Combine effects from both reasoning and style search
@@ -248,6 +286,7 @@ class DesignSystemGenerator:
 
 # ============ OUTPUT FORMATTERS ============
 BOX_WIDTH = 90  # Wider box for more content
+ANSI_RE = re.compile(r'\033\[[0-9;]*m')
 
 
 def hex_to_ansi(hex_color: str) -> str:
@@ -265,9 +304,11 @@ def hex_to_ansi(hex_color: str) -> str:
 
 
 def ansi_ljust(s: str, width: int) -> str:
-    """Like str.ljust but accounts for zero-width ANSI escape sequences."""
-    import re
-    visible_len = len(re.sub(r'\033\[[0-9;]*m', '', s))
+    """Like str.ljust but accounts for ANSI and East Asian character width."""
+    visible_len = 0
+    plain_text = ANSI_RE.sub('', s)
+    for ch in plain_text:
+        visible_len += 2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1
     pad = width - visible_len
     return s + (" " * max(0, pad))
 
@@ -308,8 +349,9 @@ def format_ascii_box(design_system: dict) -> str:
         return lines
 
     # Build sections from pattern
-    sections = pattern.get("sections", "").split(">")
-    sections = [s.strip() for s in sections if s.strip()]
+    sections_raw = pattern.get("sections", "")
+    section_delimiter = ">" if ">" in sections_raw else ","
+    sections = [s.strip() for s in sections_raw.split(section_delimiter) if s.strip()]
 
     # Build output lines
     lines = []
@@ -317,51 +359,56 @@ def format_ascii_box(design_system: dict) -> str:
 
     # Header with double-line box
     lines.append("╔" + "═" * w + "╗")
-    lines.append(ansi_ljust(f"║  TARGET: {project} - RECOMMENDED DESIGN SYSTEM", BOX_WIDTH) + "║")
+    lines.append(ansi_ljust(f"║  项目：{project} | 推荐设计系统", BOX_WIDTH) + "║")
     lines.append("╚" + "═" * w + "╝")
     lines.append("┌" + "─" * w + "┐")
 
     # Pattern section
-    lines.append(section_header("PATTERN", BOX_WIDTH + 1))
-    lines.append(f"│  Name: {pattern.get('name', '')}".ljust(BOX_WIDTH) + "│")
+    lines.append(section_header("页面结构", BOX_WIDTH + 1))
+    lines.append(ansi_ljust(f"│  名称：{pattern.get('name', '')}", BOX_WIDTH) + "│")
     if pattern.get('conversion'):
-        lines.append(f"│     Conversion: {pattern.get('conversion', '')}".ljust(BOX_WIDTH) + "│")
+        lines.append(ansi_ljust(f"│     转化重点：{pattern.get('conversion', '')}", BOX_WIDTH) + "│")
     if pattern.get('cta_placement'):
-        lines.append(f"│     CTA: {pattern.get('cta_placement', '')}".ljust(BOX_WIDTH) + "│")
-    lines.append("│     Sections:".ljust(BOX_WIDTH) + "│")
+        lines.append(ansi_ljust(f"│     CTA 位置：{pattern.get('cta_placement', '')}", BOX_WIDTH) + "│")
+    lines.append(ansi_ljust("│     页面分区：", BOX_WIDTH) + "│")
     for i, section in enumerate(sections, 1):
-        lines.append(f"│       {i}. {section}".ljust(BOX_WIDTH) + "│")
+        wrapped_section_lines = wrap_text(section, f"│       {i}. ", BOX_WIDTH)
+        if wrapped_section_lines:
+            for section_line in wrapped_section_lines:
+                lines.append(ansi_ljust(section_line, BOX_WIDTH) + "│")
+        else:
+            lines.append(ansi_ljust(f"│       {i}. {section}", BOX_WIDTH) + "│")
 
     # Style section
-    lines.append(section_header("STYLE", BOX_WIDTH + 1))
-    lines.append(f"│  Name: {style.get('name', '')}".ljust(BOX_WIDTH) + "│")
+    lines.append(section_header("视觉风格", BOX_WIDTH + 1))
+    lines.append(ansi_ljust(f"│  名称：{style.get('name', '')}", BOX_WIDTH) + "│")
     light = style.get("light_mode", "")
     dark = style.get("dark_mode", "")
     if light or dark:
-        lines.append(f"│     Mode Support: Light {light}  Dark {dark}".ljust(BOX_WIDTH) + "│")
+        lines.append(ansi_ljust(f"│     模式支持：浅色 {light}  深色 {dark}", BOX_WIDTH) + "│")
     if style.get("keywords"):
-        for line in wrap_text(f"Keywords: {style.get('keywords', '')}", "│     ", BOX_WIDTH):
-            lines.append(line.ljust(BOX_WIDTH) + "│")
+        for line in wrap_text(f"关键词：{style.get('keywords', '')}", "│     ", BOX_WIDTH):
+            lines.append(ansi_ljust(line, BOX_WIDTH) + "│")
     if style.get("best_for"):
-        for line in wrap_text(f"Best For: {style.get('best_for', '')}", "│     ", BOX_WIDTH):
-            lines.append(line.ljust(BOX_WIDTH) + "│")
+        for line in wrap_text(f"适用场景：{style.get('best_for', '')}", "│     ", BOX_WIDTH):
+            lines.append(ansi_ljust(line, BOX_WIDTH) + "│")
     if style.get("performance") or style.get("accessibility"):
-        perf_a11y = f"Performance: {style.get('performance', '')} | Accessibility: {style.get('accessibility', '')}"
-        lines.append(f"│     {perf_a11y}".ljust(BOX_WIDTH) + "│")
+        perf_a11y = f"性能：{style.get('performance', '')} | 无障碍：{style.get('accessibility', '')}"
+        lines.append(ansi_ljust(f"│     {perf_a11y}", BOX_WIDTH) + "│")
 
     # Colors section (extended palette with ANSI swatches)
-    lines.append(section_header("COLORS", BOX_WIDTH + 1))
+    lines.append(section_header("颜色系统", BOX_WIDTH + 1))
     color_entries = [
-        ("Primary",      "primary",      "--color-primary"),
-        ("On Primary",   "on_primary",   "--color-on-primary"),
-        ("Secondary",    "secondary",    "--color-secondary"),
-        ("Accent/CTA",   "accent",       "--color-accent"),
-        ("Background",   "background",   "--color-background"),
-        ("Foreground",   "foreground",   "--color-foreground"),
-        ("Muted",        "muted",        "--color-muted"),
-        ("Border",       "border",       "--color-border"),
-        ("Destructive",  "destructive",  "--color-destructive"),
-        ("Ring",         "ring",         "--color-ring"),
+        ("主色",         "primary",      "--color-primary"),
+        ("主色文字",     "on_primary",   "--color-on-primary"),
+        ("辅助色",       "secondary",    "--color-secondary"),
+        ("强调/CTA",     "accent",       "--color-accent"),
+        ("背景",         "background",   "--color-background"),
+        ("正文",         "foreground",   "--color-foreground"),
+        ("弱化色",       "muted",        "--color-muted"),
+        ("边框",         "border",       "--color-border"),
+        ("危险色",       "destructive",  "--color-destructive"),
+        ("焦点环",       "ring",         "--color-ring"),
     ]
     for label, key, css_var in color_entries:
         hex_val = colors.get(key, "")
@@ -371,48 +418,48 @@ def format_ascii_box(design_system: dict) -> str:
         content = f"│     {swatch}{label + ':':14s} {hex_val:10s} ({css_var})"
         lines.append(ansi_ljust(content, BOX_WIDTH) + "│")
     if colors.get("notes"):
-        for line in wrap_text(f"Notes: {colors.get('notes', '')}", "│     ", BOX_WIDTH):
-            lines.append(line.ljust(BOX_WIDTH) + "│")
+        for line in wrap_text(f"说明：{colors.get('notes', '')}", "│     ", BOX_WIDTH):
+            lines.append(ansi_ljust(line, BOX_WIDTH) + "│")
 
     # Typography section
-    lines.append(section_header("TYPOGRAPHY", BOX_WIDTH + 1))
-    lines.append(f"│  {typography.get('heading', '')} / {typography.get('body', '')}".ljust(BOX_WIDTH) + "│")
+    lines.append(section_header("字体排版", BOX_WIDTH + 1))
+    lines.append(ansi_ljust(f"│  标题：{typography.get('heading', '')} / 正文：{typography.get('body', '')}", BOX_WIDTH) + "│")
     if typography.get("mood"):
-        for line in wrap_text(f"Mood: {typography.get('mood', '')}", "│     ", BOX_WIDTH):
-            lines.append(line.ljust(BOX_WIDTH) + "│")
+        for line in wrap_text(f"气质：{typography.get('mood', '')}", "│     ", BOX_WIDTH):
+            lines.append(ansi_ljust(line, BOX_WIDTH) + "│")
     if typography.get("best_for"):
-        for line in wrap_text(f"Best For: {typography.get('best_for', '')}", "│     ", BOX_WIDTH):
-            lines.append(line.ljust(BOX_WIDTH) + "│")
+        for line in wrap_text(f"适用场景：{typography.get('best_for', '')}", "│     ", BOX_WIDTH):
+            lines.append(ansi_ljust(line, BOX_WIDTH) + "│")
     if typography.get("google_fonts_url"):
-        lines.append(f"│     Google Fonts: {typography.get('google_fonts_url', '')}".ljust(BOX_WIDTH) + "│")
+        lines.append(ansi_ljust(f"│     字体链接：{typography.get('google_fonts_url', '')}", BOX_WIDTH) + "│")
     if typography.get("css_import"):
-        lines.append(f"│     CSS Import: {typography.get('css_import', '')[:70]}...".ljust(BOX_WIDTH) + "│")
+        lines.append(ansi_ljust(f"│     CSS 引入：{typography.get('css_import', '')[:64]}...", BOX_WIDTH) + "│")
 
     # Key Effects section
     if effects:
-        lines.append(section_header("KEY EFFECTS", BOX_WIDTH + 1))
+        lines.append(section_header("关键表现", BOX_WIDTH + 1))
         for line in wrap_text(effects, "│     ", BOX_WIDTH):
-            lines.append(line.ljust(BOX_WIDTH) + "│")
+            lines.append(ansi_ljust(line, BOX_WIDTH) + "│")
 
     # Anti-patterns section
     if anti_patterns:
-        lines.append(section_header("AVOID", BOX_WIDTH + 1))
+        lines.append(section_header("避免事项", BOX_WIDTH + 1))
         for line in wrap_text(anti_patterns, "│     ", BOX_WIDTH):
-            lines.append(line.ljust(BOX_WIDTH) + "│")
+            lines.append(ansi_ljust(line, BOX_WIDTH) + "│")
 
     # Pre-Delivery Checklist section
-    lines.append(section_header("PRE-DELIVERY CHECKLIST", BOX_WIDTH + 1))
+    lines.append(section_header("交付前检查", BOX_WIDTH + 1))
     checklist_items = [
-        "[ ] No emojis as icons (use SVG: Heroicons/Lucide)",
-        "[ ] cursor-pointer on all clickable elements",
-        "[ ] Hover states with smooth transitions (150-300ms)",
-        "[ ] Light mode: text contrast 4.5:1 minimum",
-        "[ ] Focus states visible for keyboard nav",
-        "[ ] prefers-reduced-motion respected",
-        "[ ] Responsive: 375px, 768px, 1024px, 1440px"
+        "[ ] 不用表情充当功能图标，统一使用 SVG 图标库",
+        "[ ] 所有可点击元素都有明确交互态",
+        "[ ] 状态过渡保持在 150-300ms",
+        "[ ] 浅色与深色模式都校验文本对比度",
+        "[ ] 键盘焦点态与无障碍标签可见",
+        "[ ] 尊重 prefers-reduced-motion",
+        "[ ] 至少验证 375px、768px、1024px 三档布局"
     ]
     for item in checklist_items:
-        lines.append(f"│     {item}".ljust(BOX_WIDTH) + "│")
+        lines.append(ansi_ljust(f"│     {item}", BOX_WIDTH) + "│")
 
     lines.append("└" + "─" * w + "┘")
 
@@ -430,72 +477,72 @@ def format_markdown(design_system: dict) -> str:
     anti_patterns = design_system.get("anti_patterns", "")
 
     lines = []
-    lines.append(f"## Design System: {project}")
+    lines.append(f"## 设计系统：{project}")
     lines.append("")
 
     # Pattern section
-    lines.append("### Pattern")
-    lines.append(f"- **Name:** {pattern.get('name', '')}")
+    lines.append("### 页面结构")
+    lines.append(f"- **名称：** {pattern.get('name', '')}")
     if pattern.get('conversion'):
-        lines.append(f"- **Conversion Focus:** {pattern.get('conversion', '')}")
+        lines.append(f"- **转化重点：** {pattern.get('conversion', '')}")
     if pattern.get('cta_placement'):
-        lines.append(f"- **CTA Placement:** {pattern.get('cta_placement', '')}")
+        lines.append(f"- **CTA 位置：** {pattern.get('cta_placement', '')}")
     if pattern.get('color_strategy'):
-        lines.append(f"- **Color Strategy:** {pattern.get('color_strategy', '')}")
-    lines.append(f"- **Sections:** {pattern.get('sections', '')}")
+        lines.append(f"- **颜色策略：** {pattern.get('color_strategy', '')}")
+    lines.append(f"- **页面分区：** {pattern.get('sections', '')}")
     lines.append("")
 
     # Style section
-    lines.append("### Style")
-    lines.append(f"- **Name:** {style.get('name', '')}")
+    lines.append("### 视觉风格")
+    lines.append(f"- **名称：** {style.get('name', '')}")
     light = style.get("light_mode", "")
     dark = style.get("dark_mode", "")
     if light or dark:
-        lines.append(f"- **Mode Support:** Light {light} | Dark {dark}")
+        lines.append(f"- **模式支持：** 浅色 {light} | 深色 {dark}")
     if style.get('keywords'):
-        lines.append(f"- **Keywords:** {style.get('keywords', '')}")
+        lines.append(f"- **关键词：** {style.get('keywords', '')}")
     if style.get('best_for'):
-        lines.append(f"- **Best For:** {style.get('best_for', '')}")
+        lines.append(f"- **适用场景：** {style.get('best_for', '')}")
     if style.get('performance') or style.get('accessibility'):
-        lines.append(f"- **Performance:** {style.get('performance', '')} | **Accessibility:** {style.get('accessibility', '')}")
+        lines.append(f"- **性能：** {style.get('performance', '')} | **无障碍：** {style.get('accessibility', '')}")
     lines.append("")
 
     # Colors section (extended palette)
-    lines.append("### Colors")
-    lines.append("| Role | Hex | CSS Variable |")
-    lines.append("|------|-----|--------------|")
+    lines.append("### 颜色系统")
+    lines.append("| 角色 | Hex | CSS 变量 |")
+    lines.append("|------|-----|----------|")
     md_color_entries = [
-        ("Primary",      "primary",      "--color-primary"),
-        ("On Primary",   "on_primary",   "--color-on-primary"),
-        ("Secondary",    "secondary",    "--color-secondary"),
-        ("Accent/CTA",   "accent",       "--color-accent"),
-        ("Background",   "background",   "--color-background"),
-        ("Foreground",   "foreground",   "--color-foreground"),
-        ("Muted",        "muted",        "--color-muted"),
-        ("Border",       "border",       "--color-border"),
-        ("Destructive",  "destructive",  "--color-destructive"),
-        ("Ring",         "ring",         "--color-ring"),
+        ("主色",         "primary",      "--color-primary"),
+        ("主色文字",     "on_primary",   "--color-on-primary"),
+        ("辅助色",       "secondary",    "--color-secondary"),
+        ("强调/CTA",     "accent",       "--color-accent"),
+        ("背景",         "background",   "--color-background"),
+        ("正文",         "foreground",   "--color-foreground"),
+        ("弱化色",       "muted",        "--color-muted"),
+        ("边框",         "border",       "--color-border"),
+        ("危险色",       "destructive",  "--color-destructive"),
+        ("焦点环",       "ring",         "--color-ring"),
     ]
     for label, key, css_var in md_color_entries:
         hex_val = colors.get(key, "")
         if hex_val:
             lines.append(f"| {label} | `{hex_val}` | `{css_var}` |")
     if colors.get("notes"):
-        lines.append(f"\n*Notes: {colors.get('notes', '')}*")
+        lines.append(f"\n*说明：{colors.get('notes', '')}*")
     lines.append("")
 
     # Typography section
-    lines.append("### Typography")
-    lines.append(f"- **Heading:** {typography.get('heading', '')}")
-    lines.append(f"- **Body:** {typography.get('body', '')}")
+    lines.append("### 字体排版")
+    lines.append(f"- **标题字体：** {typography.get('heading', '')}")
+    lines.append(f"- **正文字体：** {typography.get('body', '')}")
     if typography.get("mood"):
-        lines.append(f"- **Mood:** {typography.get('mood', '')}")
+        lines.append(f"- **气质：** {typography.get('mood', '')}")
     if typography.get("best_for"):
-        lines.append(f"- **Best For:** {typography.get('best_for', '')}")
+        lines.append(f"- **适用场景：** {typography.get('best_for', '')}")
     if typography.get("google_fonts_url"):
-        lines.append(f"- **Google Fonts:** {typography.get('google_fonts_url', '')}")
+        lines.append(f"- **字体链接：** {typography.get('google_fonts_url', '')}")
     if typography.get("css_import"):
-        lines.append(f"- **CSS Import:**")
+        lines.append("- **CSS 引入：**")
         lines.append(f"```css")
         lines.append(f"{typography.get('css_import', '')}")
         lines.append(f"```")
@@ -503,26 +550,26 @@ def format_markdown(design_system: dict) -> str:
 
     # Key Effects section
     if effects:
-        lines.append("### Key Effects")
+        lines.append("### 关键表现")
         lines.append(f"{effects}")
         lines.append("")
 
     # Anti-patterns section
     if anti_patterns:
-        lines.append("### Avoid (Anti-patterns)")
+        lines.append("### 避免事项")
         newline_bullet = '\n- '
         lines.append(f"- {anti_patterns.replace(' + ', newline_bullet)}")
         lines.append("")
 
     # Pre-Delivery Checklist section
-    lines.append("### Pre-Delivery Checklist")
-    lines.append("- [ ] No emojis as icons (use SVG: Heroicons/Lucide)")
-    lines.append("- [ ] cursor-pointer on all clickable elements")
-    lines.append("- [ ] Hover states with smooth transitions (150-300ms)")
-    lines.append("- [ ] Light mode: text contrast 4.5:1 minimum")
-    lines.append("- [ ] Focus states visible for keyboard nav")
-    lines.append("- [ ] prefers-reduced-motion respected")
-    lines.append("- [ ] Responsive: 375px, 768px, 1024px, 1440px")
+    lines.append("### 交付前检查")
+    lines.append("- [ ] 不用表情充当功能图标，统一使用 SVG 图标库")
+    lines.append("- [ ] 所有可点击元素都有明确交互态")
+    lines.append("- [ ] 状态过渡保持在 150-300ms")
+    lines.append("- [ ] 浅色与深色模式都校验文本对比度")
+    lines.append("- [ ] 键盘焦点态与无障碍标签可见")
+    lines.append("- [ ] 尊重 `prefers-reduced-motion`")
+    lines.append("- [ ] 至少验证 375px、768px、1024px 三档布局")
     lines.append("")
 
     return "\n".join(lines)
@@ -624,41 +671,41 @@ def format_master_md(design_system: dict) -> str:
     lines = []
     
     # Logic header
-    lines.append("# Design System Master File")
+    lines.append("# 设计系统主文件")
     lines.append("")
-    lines.append("> **LOGIC:** When building a specific page, first check `design-system/pages/[page-name].md`.")
-    lines.append("> If that file exists, its rules **override** this Master file.")
-    lines.append("> If not, strictly follow the rules below.")
-    lines.append("")
-    lines.append("---")
-    lines.append("")
-    lines.append(f"**Project:** {project}")
-    lines.append(f"**Generated:** {timestamp}")
-    lines.append(f"**Category:** {design_system.get('category', 'General')}")
+    lines.append("> **规则：** 开发具体页面时，先检查 `design-system/pages/[page-name].md`。")
+    lines.append("> 如果该文件存在，以页面文件中的规则 **覆盖** 本主文件。")
+    lines.append("> 如果不存在，则严格遵循本主文件。")
     lines.append("")
     lines.append("---")
     lines.append("")
-    
+    lines.append(f"**项目：** {project}")
+    lines.append(f"**生成时间：** {timestamp}")
+    lines.append(f"**产品类型：** {design_system.get('category', 'General')}")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+
     # Global Rules section
-    lines.append("## Global Rules")
+    lines.append("## 全局规则")
     lines.append("")
-    
+
     # Color Palette
-    lines.append("### Color Palette")
+    lines.append("### 颜色系统")
     lines.append("")
-    lines.append("| Role | Hex | CSS Variable |")
-    lines.append("|------|-----|--------------|")
+    lines.append("| 角色 | Hex | CSS 变量 |")
+    lines.append("|------|-----|----------|")
     master_color_entries = [
-        ("Primary",      "primary",      "--color-primary"),
-        ("On Primary",   "on_primary",   "--color-on-primary"),
-        ("Secondary",    "secondary",    "--color-secondary"),
-        ("Accent/CTA",   "accent",       "--color-accent"),
-        ("Background",   "background",   "--color-background"),
-        ("Foreground",   "foreground",   "--color-foreground"),
-        ("Muted",        "muted",        "--color-muted"),
-        ("Border",       "border",       "--color-border"),
-        ("Destructive",  "destructive",  "--color-destructive"),
-        ("Ring",         "ring",         "--color-ring"),
+        ("主色",         "primary",      "--color-primary"),
+        ("主色文字",     "on_primary",   "--color-on-primary"),
+        ("辅助色",       "secondary",    "--color-secondary"),
+        ("强调/CTA",     "accent",       "--color-accent"),
+        ("背景",         "background",   "--color-background"),
+        ("正文",         "foreground",   "--color-foreground"),
+        ("弱化色",       "muted",        "--color-muted"),
+        ("边框",         "border",       "--color-border"),
+        ("危险色",       "destructive",  "--color-destructive"),
+        ("焦点环",       "ring",         "--color-ring"),
     ]
     for label, key, css_var in master_color_entries:
         hex_val = colors.get(key, "")
@@ -666,62 +713,62 @@ def format_master_md(design_system: dict) -> str:
             lines.append(f"| {label} | `{hex_val}` | `{css_var}` |")
     lines.append("")
     if colors.get("notes"):
-        lines.append(f"**Color Notes:** {colors.get('notes', '')}")
+        lines.append(f"**颜色说明：** {colors.get('notes', '')}")
         lines.append("")
-    
+
     # Typography
-    lines.append("### Typography")
+    lines.append("### 字体排版")
     lines.append("")
-    lines.append(f"- **Heading Font:** {typography.get('heading', 'Inter')}")
-    lines.append(f"- **Body Font:** {typography.get('body', 'Inter')}")
+    lines.append(f"- **标题字体：** {typography.get('heading', 'Noto Sans SC')}")
+    lines.append(f"- **正文字体：** {typography.get('body', 'Noto Sans SC')}")
     if typography.get("mood"):
-        lines.append(f"- **Mood:** {typography.get('mood', '')}")
+        lines.append(f"- **气质：** {typography.get('mood', '')}")
     if typography.get("google_fonts_url"):
-        lines.append(f"- **Google Fonts:** [{typography.get('heading', '')} + {typography.get('body', '')}]({typography.get('google_fonts_url', '')})")
+        lines.append(f"- **字体链接：** [{typography.get('heading', '')} + {typography.get('body', '')}]({typography.get('google_fonts_url', '')})")
     lines.append("")
     if typography.get("css_import"):
-        lines.append("**CSS Import:**")
+        lines.append("**CSS 引入：**")
         lines.append("```css")
         lines.append(typography.get("css_import", ""))
         lines.append("```")
         lines.append("")
-    
+
     # Spacing Variables
-    lines.append("### Spacing Variables")
+    lines.append("### 间距变量")
     lines.append("")
-    lines.append("| Token | Value | Usage |")
-    lines.append("|-------|-------|-------|")
-    lines.append("| `--space-xs` | `4px` / `0.25rem` | Tight gaps |")
-    lines.append("| `--space-sm` | `8px` / `0.5rem` | Icon gaps, inline spacing |")
-    lines.append("| `--space-md` | `16px` / `1rem` | Standard padding |")
-    lines.append("| `--space-lg` | `24px` / `1.5rem` | Section padding |")
-    lines.append("| `--space-xl` | `32px` / `2rem` | Large gaps |")
-    lines.append("| `--space-2xl` | `48px` / `3rem` | Section margins |")
-    lines.append("| `--space-3xl` | `64px` / `4rem` | Hero padding |")
+    lines.append("| Token | 值 | 用途 |")
+    lines.append("|-------|----|------|")
+    lines.append("| `--space-xs` | `4px` / `0.25rem` | 贴身间距 |")
+    lines.append("| `--space-sm` | `8px` / `0.5rem` | 图标与行内间距 |")
+    lines.append("| `--space-md` | `16px` / `1rem` | 常规内边距 |")
+    lines.append("| `--space-lg` | `24px` / `1.5rem` | 区块内边距 |")
+    lines.append("| `--space-xl` | `32px` / `2rem` | 大型留白 |")
+    lines.append("| `--space-2xl` | `48px` / `3rem` | 区块外边距 |")
+    lines.append("| `--space-3xl` | `64px` / `4rem` | 首屏区留白 |")
     lines.append("")
-    
+
     # Shadow Depths
-    lines.append("### Shadow Depths")
+    lines.append("### 阴影层级")
     lines.append("")
-    lines.append("| Level | Value | Usage |")
-    lines.append("|-------|-------|-------|")
-    lines.append("| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)` | Subtle lift |")
-    lines.append("| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.1)` | Cards, buttons |")
-    lines.append("| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)` | Modals, dropdowns |")
-    lines.append("| `--shadow-xl` | `0 20px 25px rgba(0,0,0,0.15)` | Hero images, featured cards |")
+    lines.append("| 等级 | 值 | 用途 |")
+    lines.append("|------|----|------|")
+    lines.append("| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)` | 轻微抬升 |")
+    lines.append("| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.1)` | 卡片、按钮 |")
+    lines.append("| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)` | 弹窗、下拉层 |")
+    lines.append("| `--shadow-xl` | `0 20px 25px rgba(0,0,0,0.15)` | 首屏主视觉、重点卡片 |")
     lines.append("")
     
     # Component Specs section
     lines.append("---")
     lines.append("")
-    lines.append("## Component Specs")
+    lines.append("## 组件规格")
     lines.append("")
     
     # Buttons
-    lines.append("### Buttons")
+    lines.append("### 按钮")
     lines.append("")
     lines.append("```css")
-    lines.append("/* Primary Button */")
+    lines.append("/* 主按钮 */")
     lines.append(".btn-primary {")
     lines.append(f"  background: {colors.get('cta', '#F97316')};")
     lines.append("  color: white;")
@@ -737,7 +784,7 @@ def format_master_md(design_system: dict) -> str:
     lines.append("  transform: translateY(-1px);")
     lines.append("}")
     lines.append("")
-    lines.append("/* Secondary Button */")
+    lines.append("/* 次按钮 */")
     lines.append(".btn-secondary {")
     lines.append(f"  background: transparent;")
     lines.append(f"  color: {colors.get('primary', '#2563EB')};")
@@ -752,7 +799,7 @@ def format_master_md(design_system: dict) -> str:
     lines.append("")
     
     # Cards
-    lines.append("### Cards")
+    lines.append("### 卡片")
     lines.append("")
     lines.append("```css")
     lines.append(".card {")
@@ -772,7 +819,7 @@ def format_master_md(design_system: dict) -> str:
     lines.append("")
     
     # Inputs
-    lines.append("### Inputs")
+    lines.append("### 输入框")
     lines.append("")
     lines.append("```css")
     lines.append(".input {")
@@ -792,7 +839,7 @@ def format_master_md(design_system: dict) -> str:
     lines.append("")
     
     # Modals
-    lines.append("### Modals")
+    lines.append("### 弹窗")
     lines.append("")
     lines.append("```css")
     lines.append(".modal-overlay {")
@@ -814,36 +861,36 @@ def format_master_md(design_system: dict) -> str:
     # Style section
     lines.append("---")
     lines.append("")
-    lines.append("## Style Guidelines")
+    lines.append("## 风格规范")
     lines.append("")
-    lines.append(f"**Style:** {style.get('name', 'Minimalism')}")
+    lines.append(f"**风格：** {style.get('name', 'Minimalism')}")
     lines.append("")
     if style.get("keywords"):
-        lines.append(f"**Keywords:** {style.get('keywords', '')}")
+        lines.append(f"**关键词：** {style.get('keywords', '')}")
         lines.append("")
     if style.get("best_for"):
-        lines.append(f"**Best For:** {style.get('best_for', '')}")
+        lines.append(f"**适用场景：** {style.get('best_for', '')}")
         lines.append("")
     if effects:
-        lines.append(f"**Key Effects:** {effects}")
+        lines.append(f"**关键表现：** {effects}")
         lines.append("")
-    
+
     # Layout Pattern
-    lines.append("### Page Pattern")
+    lines.append("### 页面结构")
     lines.append("")
-    lines.append(f"**Pattern Name:** {pattern.get('name', '')}")
+    lines.append(f"**结构名称：** {pattern.get('name', '')}")
     lines.append("")
     if pattern.get('conversion'):
-        lines.append(f"- **Conversion Strategy:** {pattern.get('conversion', '')}")
+        lines.append(f"- **转化策略：** {pattern.get('conversion', '')}")
     if pattern.get('cta_placement'):
-        lines.append(f"- **CTA Placement:** {pattern.get('cta_placement', '')}")
-    lines.append(f"- **Section Order:** {pattern.get('sections', '')}")
+        lines.append(f"- **CTA 位置：** {pattern.get('cta_placement', '')}")
+    lines.append(f"- **页面分区：** {pattern.get('sections', '')}")
     lines.append("")
-    
+
     # Anti-Patterns section
     lines.append("---")
     lines.append("")
-    lines.append("## Anti-Patterns (Do NOT Use)")
+    lines.append("## 反模式（禁止使用）")
     lines.append("")
     if anti_patterns:
         anti_list = [a.strip() for a in anti_patterns.split("+")]
@@ -851,33 +898,32 @@ def format_master_md(design_system: dict) -> str:
             if anti:
                 lines.append(f"- ❌ {anti}")
     lines.append("")
-    lines.append("### Additional Forbidden Patterns")
+    lines.append("### 补充禁止项")
     lines.append("")
-    lines.append("- ❌ **Emojis as icons** — Use SVG icons (Heroicons, Lucide, Simple Icons)")
-    lines.append("- ❌ **Missing cursor:pointer** — All clickable elements must have cursor:pointer")
-    lines.append("- ❌ **Layout-shifting hovers** — Avoid scale transforms that shift layout")
-    lines.append("- ❌ **Low contrast text** — Maintain 4.5:1 minimum contrast ratio")
-    lines.append("- ❌ **Instant state changes** — Always use transitions (150-300ms)")
-    lines.append("- ❌ **Invisible focus states** — Focus states must be visible for a11y")
+    lines.append("- ❌ **用表情当图标**：功能图标统一使用 SVG 图标库")
+    lines.append("- ❌ **缺少交互态**：所有可点击元素都必须有明确状态反馈")
+    lines.append("- ❌ **悬浮导致布局偏移**：避免让 hover/press 影响周边排版")
+    lines.append("- ❌ **文本对比度不足**：正文至少满足 4.5:1")
+    lines.append("- ❌ **状态变化过于生硬**：默认保留 150-300ms 的过渡")
+    lines.append("- ❌ **焦点态不可见**：键盘和辅助技术必须能识别当前焦点")
     lines.append("")
-    
+
     # Pre-Delivery Checklist
     lines.append("---")
     lines.append("")
-    lines.append("## Pre-Delivery Checklist")
+    lines.append("## 交付前检查")
     lines.append("")
-    lines.append("Before delivering any UI code, verify:")
+    lines.append("交付任何 UI 代码前，至少确认以下事项：")
     lines.append("")
-    lines.append("- [ ] No emojis used as icons (use SVG instead)")
-    lines.append("- [ ] All icons from consistent icon set (Heroicons/Lucide)")
-    lines.append("- [ ] `cursor-pointer` on all clickable elements")
-    lines.append("- [ ] Hover states with smooth transitions (150-300ms)")
-    lines.append("- [ ] Light mode: text contrast 4.5:1 minimum")
-    lines.append("- [ ] Focus states visible for keyboard navigation")
-    lines.append("- [ ] `prefers-reduced-motion` respected")
-    lines.append("- [ ] Responsive: 375px, 768px, 1024px, 1440px")
-    lines.append("- [ ] No content hidden behind fixed navbars")
-    lines.append("- [ ] No horizontal scroll on mobile")
+    lines.append("- [ ] 不用表情充当功能图标，且图标库保持一致")
+    lines.append("- [ ] 所有可点击元素都有明确交互态")
+    lines.append("- [ ] 状态过渡保持在 150-300ms")
+    lines.append("- [ ] 浅色模式与深色模式都校验 4.5:1 文本对比度")
+    lines.append("- [ ] 焦点态、屏幕阅读器标签、错误反馈都可见")
+    lines.append("- [ ] 遵守 `prefers-reduced-motion`")
+    lines.append("- [ ] 至少验证 375px、768px、1024px、1440px 四档")
+    lines.append("- [ ] 固定头部/底部不会遮挡内容")
+    lines.append("- [ ] 移动端不存在横向滚动")
     lines.append("")
     
     return "\n".join(lines)
@@ -894,94 +940,94 @@ def format_page_override_md(design_system: dict, page_name: str, page_query: str
     
     lines = []
     
-    lines.append(f"# {page_title} Page Overrides")
+    lines.append(f"# {page_title} 页面覆盖规则")
     lines.append("")
-    lines.append(f"> **PROJECT:** {project}")
-    lines.append(f"> **Generated:** {timestamp}")
-    lines.append(f"> **Page Type:** {page_overrides.get('page_type', 'General')}")
+    lines.append(f"> **项目：** {project}")
+    lines.append(f"> **生成时间：** {timestamp}")
+    lines.append(f"> **页面类型：** {page_overrides.get('page_type', '通用页面')}")
     lines.append("")
-    lines.append("> ⚠️ **IMPORTANT:** Rules in this file **override** the Master file (`design-system/MASTER.md`).")
-    lines.append("> Only deviations from the Master are documented here. For all other rules, refer to the Master.")
+    lines.append("> ⚠️ **注意：** 本文件中的规则会 **覆盖** `design-system/MASTER.md`。")
+    lines.append("> 这里只记录相对主文件的差异项，未提及部分一律回到主文件执行。")
     lines.append("")
     lines.append("---")
     lines.append("")
-    
+
     # Page-specific rules with actual content
-    lines.append("## Page-Specific Rules")
+    lines.append("## 页面专属规则")
     lines.append("")
-    
+
     # Layout Overrides
-    lines.append("### Layout Overrides")
+    lines.append("### 布局覆盖")
     lines.append("")
     layout = page_overrides.get("layout", {})
     if layout:
         for key, value in layout.items():
             lines.append(f"- **{key}:** {value}")
     else:
-        lines.append("- No overrides — use Master layout")
+        lines.append("- 无覆盖，沿用主文件布局")
     lines.append("")
     
     # Spacing Overrides
-    lines.append("### Spacing Overrides")
+    lines.append("### 间距覆盖")
     lines.append("")
     spacing = page_overrides.get("spacing", {})
     if spacing:
         for key, value in spacing.items():
             lines.append(f"- **{key}:** {value}")
     else:
-        lines.append("- No overrides — use Master spacing")
+        lines.append("- 无覆盖，沿用主文件间距")
     lines.append("")
     
     # Typography Overrides
-    lines.append("### Typography Overrides")
+    lines.append("### 字体覆盖")
     lines.append("")
     typography = page_overrides.get("typography", {})
     if typography:
         for key, value in typography.items():
             lines.append(f"- **{key}:** {value}")
     else:
-        lines.append("- No overrides — use Master typography")
+        lines.append("- 无覆盖，沿用主文件字体")
     lines.append("")
     
     # Color Overrides
-    lines.append("### Color Overrides")
+    lines.append("### 颜色覆盖")
     lines.append("")
     colors = page_overrides.get("colors", {})
     if colors:
         for key, value in colors.items():
             lines.append(f"- **{key}:** {value}")
     else:
-        lines.append("- No overrides — use Master colors")
+        lines.append("- 无覆盖，沿用主文件颜色")
     lines.append("")
     
     # Component Overrides
-    lines.append("### Component Overrides")
+    lines.append("### 组件覆盖")
     lines.append("")
     components = page_overrides.get("components", [])
     if components:
         for comp in components:
             lines.append(f"- {comp}")
     else:
-        lines.append("- No overrides — use Master component specs")
+        lines.append("- 无覆盖，沿用主文件组件规格")
     lines.append("")
     
     # Page-Specific Components
     lines.append("---")
     lines.append("")
-    lines.append("## Page-Specific Components")
+    lines.append("## 页面专属组件")
     lines.append("")
     unique_components = page_overrides.get("unique_components", [])
     if unique_components:
         for comp in unique_components:
             lines.append(f"- {comp}")
     else:
-        lines.append("- No unique components for this page")
+        lines.append("- 当前页面没有额外专属组件")
     lines.append("")
     
     # Recommendations
     lines.append("---")
     lines.append("")
-    lines.append("## Recommendations")
+    lines.append("## 额外建议")
     lines.append("")
     recommendations = page_overrides.get("recommendations", [])
     if recommendations:
@@ -1037,19 +1083,19 @@ def _generate_intelligent_overrides(page_name: str, page_query: str, design_syst
         
         # Infer layout from style keywords
         if any(kw in keywords.lower() for kw in ["data", "dense", "dashboard", "grid"]):
-            layout["Max Width"] = "1400px or full-width"
-            layout["Grid"] = "12-column grid for data flexibility"
-            spacing["Content Density"] = "High — optimize for information display"
+            layout["最大宽度"] = "1400px 或全宽"
+            layout["栅格"] = "12 栏栅格，便于数据密度调整"
+            spacing["信息密度"] = "高，优先保证信息展示效率"
         elif any(kw in keywords.lower() for kw in ["minimal", "simple", "clean", "single"]):
-            layout["Max Width"] = "800px (narrow, focused)"
-            layout["Layout"] = "Single column, centered"
-            spacing["Content Density"] = "Low — focus on clarity"
+            layout["最大宽度"] = "800px（窄版聚焦）"
+            layout["布局"] = "单列居中"
+            spacing["信息密度"] = "低，优先保证清晰度"
         else:
-            layout["Max Width"] = "1200px (standard)"
-            layout["Layout"] = "Full-width sections, centered content"
-        
+            layout["最大宽度"] = "1200px（标准）"
+            layout["布局"] = "通栏分区 + 内容居中"
+
         if effects:
-            recommendations.append(f"Effects: {effects}")
+            recommendations.append(f"表现建议：{effects}")
     
     # Extract UX guidelines as recommendations
     for ux in ux_results:
@@ -1057,9 +1103,9 @@ def _generate_intelligent_overrides(page_name: str, page_query: str, design_syst
         do_text = ux.get("Do", "")
         dont_text = ux.get("Don't", "")
         if do_text:
-            recommendations.append(f"{category}: {do_text}")
+            recommendations.append(f"{category}：{do_text}")
         if dont_text:
-            components.append(f"Avoid: {dont_text}")
+            components.append(f"避免：{dont_text}")
     
     # Extract landing pattern info for section structure
     if landing_results:
@@ -1069,21 +1115,21 @@ def _generate_intelligent_overrides(page_name: str, page_query: str, design_syst
         color_strategy = landing.get("Color Strategy", "")
         
         if sections:
-            layout["Sections"] = sections
+            layout["页面分区"] = sections
         if cta_placement:
-            recommendations.append(f"CTA Placement: {cta_placement}")
+            recommendations.append(f"CTA 位置：{cta_placement}")
         if color_strategy:
-            colors["Strategy"] = color_strategy
+            colors["策略"] = color_strategy
     
     # Add page-type specific defaults if no search results
     if not layout:
-        layout["Max Width"] = "1200px"
-        layout["Layout"] = "Responsive grid"
-    
+        layout["最大宽度"] = "1200px"
+        layout["布局"] = "响应式栅格"
+
     if not recommendations:
         recommendations = [
-            "Refer to MASTER.md for all design rules",
-            "Add specific overrides as needed for this page"
+            "先回到 MASTER.md 执行全局设计规则",
+            "仅在当前页面确有差异时再补充覆盖项"
         ]
     
     return {
@@ -1100,20 +1146,20 @@ def _generate_intelligent_overrides(page_name: str, page_query: str, design_syst
 
 def _detect_page_type(context: str, style_results: list) -> str:
     """Detect page type from context and search results."""
-    context_lower = context.lower()
+    context_lower = normalize_query(context).lower()
     
     # Check for common page type patterns
     page_patterns = [
-        (["dashboard", "admin", "analytics", "data", "metrics", "stats", "monitor", "overview"], "Dashboard / Data View"),
-        (["checkout", "payment", "cart", "purchase", "order", "billing"], "Checkout / Payment"),
-        (["settings", "profile", "account", "preferences", "config"], "Settings / Profile"),
-        (["landing", "marketing", "homepage", "hero", "home", "promo"], "Landing / Marketing"),
-        (["login", "signin", "signup", "register", "auth", "password"], "Authentication"),
-        (["pricing", "plans", "subscription", "tiers", "packages"], "Pricing / Plans"),
-        (["blog", "article", "post", "news", "content", "story"], "Blog / Article"),
-        (["product", "item", "detail", "pdp", "shop", "store"], "Product Detail"),
-        (["search", "results", "browse", "filter", "catalog", "list"], "Search Results"),
-        (["empty", "404", "error", "not found", "zero"], "Empty State"),
+        (["dashboard", "admin", "analytics", "data", "metrics", "stats", "monitor", "overview"], "仪表盘 / 数据视图"),
+        (["checkout", "payment", "cart", "purchase", "order", "billing"], "结算 / 支付"),
+        (["settings", "profile", "account", "preferences", "config"], "设置 / 个人中心"),
+        (["landing", "marketing", "homepage", "hero", "home", "promo"], "落地页 / 营销页"),
+        (["login", "signin", "signup", "register", "auth", "password"], "认证页面"),
+        (["pricing", "plans", "subscription", "tiers", "packages"], "价格 / 套餐页"),
+        (["blog", "article", "post", "news", "content", "story"], "文章 / 内容页"),
+        (["product", "item", "detail", "pdp", "shop", "store"], "详情页"),
+        (["search", "results", "browse", "filter", "catalog", "list"], "搜索结果页"),
+        (["empty", "404", "error", "not found", "zero"], "空状态 / 错误页"),
     ]
     
     for keywords, page_type in page_patterns:
@@ -1126,11 +1172,11 @@ def _detect_page_type(context: str, style_results: list) -> str:
         best_for = style_results[0].get("Best For", "").lower()
         
         if "dashboard" in best_for or "data" in best_for:
-            return "Dashboard / Data View"
+            return "仪表盘 / 数据视图"
         elif "landing" in best_for or "marketing" in best_for:
-            return "Landing / Marketing"
-    
-    return "General"
+            return "落地页 / 营销页"
+
+    return "通用页面"
 
 
 # ============ CLI SUPPORT ============
