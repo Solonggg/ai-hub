@@ -24,3 +24,4 @@ __pycache__/
 *.swo
 *~
 /skills/.system/
+/skills/daily_news/reports/
