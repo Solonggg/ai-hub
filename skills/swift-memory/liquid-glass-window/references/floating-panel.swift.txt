@@ -1,0 +1,78 @@
+// 非激活但可成为 key 的 NSPanel —— 用在"从系统任何位置用热键召唤、输入完即消失"的 HUD 风格面板
+import Cocoa
+import SwiftUI
+
+/// canBecomeKey = true 保证 SwiftUI TextField 能接收输入；
+/// canBecomeMain = false 避免接管应用主窗口语义（Cmd+M 等）。
+final class FloatingPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+    override var acceptsFirstResponder: Bool { true }
+}
+
+final class HUDPanelWindow {
+    private var panel: NSPanel?
+    private var mouseMonitor: Any?
+    private let panelWidth: CGFloat = 420
+    private let panelHeight: CGFloat = 560
+    private static let cornerRadius: CGFloat = 12
+
+    func show<Content: View>(content: Content) {
+        close()
+
+        let hostView = NSHostingView(rootView: content)
+        hostView.frame = NSRect(x: 0, y: 0, width: panelWidth, height: panelHeight)
+        hostView.wantsLayer = true
+        hostView.layer?.cornerRadius = Self.cornerRadius
+        hostView.layer?.cornerCurve = .continuous
+        hostView.layer?.masksToBounds = true
+        hostView.layer?.backgroundColor = NSColor.clear.cgColor
+
+        let p = FloatingPanel(
+            contentRect: hostView.frame,
+            styleMask: [.nonactivatingPanel, .borderless],
+            backing: .buffered,
+            defer: false
+        )
+        p.isFloatingPanel = true
+        p.level = .floating
+        p.hasShadow = true
+        p.backgroundColor = .clear
+        p.isOpaque = false
+        p.contentView = hostView
+        p.isReleasedWhenClosed = false
+        p.hidesOnDeactivate = false
+
+        // 居中略偏上（人眼"视觉中心"高于几何中心）
+        let screen = NSScreen.main ?? NSScreen.screens.first!
+        let vf = screen.visibleFrame
+        p.setFrameOrigin(NSPoint(
+            x: vf.midX - panelWidth / 2,
+            y: vf.midY - panelHeight / 2 + vf.height * 0.10
+        ))
+
+        panel = p
+        p.makeKeyAndOrderFront(nil)
+
+        DispatchQueue.main.async { [weak p] in
+            p?.invalidateShadow()
+            p?.displayIfNeeded()
+        }
+
+        // 面板外任意点击即关 —— HUD 风格的惯用交互
+        mouseMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        ) { [weak self] _ in
+            self?.close()
+        }
+    }
+
+    func close() {
+        if let m = mouseMonitor {
+            NSEvent.removeMonitor(m)
+            mouseMonitor = nil
+        }
+        panel?.close()
+        panel = nil
+    }
+}

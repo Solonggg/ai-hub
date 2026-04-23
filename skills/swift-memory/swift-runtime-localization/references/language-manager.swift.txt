@@ -1,0 +1,101 @@
+// 运行时语言覆盖：swizzle Bundle.localizedString(forKey:value:table:) 把
+// Bundle.main 的调用路由到用户所选 lproj bundle。
+//
+// 使用要点：
+//   - applicationDidFinishLaunching 最前面调一次 apply(_:) —— 早于任何 String(localized:) 读取
+//   - Settings UI 里切换调用 apply；视图层用 .id("...-\(language)") 配合 remount
+//   - AppKit 控件（NSMenu、NSWindow.title）在 traceLanguageDidChange 回调里手动刷
+import Foundation
+import ObjectiveC.runtime
+
+extension Notification.Name {
+    /// apply(_:) 完成后派发 —— 观察者据此清缓存 / 刷 NSMenu / 发送视图 remount 信号
+    static let traceLanguageDidChange = Notification.Name("TraceLanguageDidChange")
+}
+
+final class LanguageManager {
+    static let shared = LanguageManager()
+
+    /// "system" | "en" | "zh-Hans" | ...
+    private(set) var current: String = "system"
+    private var overrideBundleRef: Bundle? = nil
+
+    private init() {
+        Self.installSwizzleOnce()
+    }
+
+    /// 应用一个语言选择；"system" 表示回退到系统语言
+    func apply(_ value: String) {
+        current = value
+        overrideBundleRef = Self.resolveBundle(for: value)
+        NotificationCenter.default.post(name: .traceLanguageDidChange, object: nil)
+    }
+
+    fileprivate var activeOverride: Bundle? { overrideBundleRef }
+
+    private static func resolveBundle(for value: String) -> Bundle? {
+        guard value != "system" else { return nil }   // system 走原始逻辑
+        guard let path = Bundle.main.path(forResource: value, ofType: "lproj"),
+              let bundle = Bundle(path: path) else {
+            return nil
+        }
+        return bundle
+    }
+
+    private static var didSwizzle = false
+    private static let swizzleLock = NSLock()
+
+    private static func installSwizzleOnce() {
+        swizzleLock.lock(); defer { swizzleLock.unlock() }
+        guard !didSwizzle else { return }
+        didSwizzle = true
+
+        let cls: AnyClass = Bundle.self
+        let originalSel = #selector(Bundle.localizedString(forKey:value:table:))
+        let swizzledSel = #selector(Bundle._trace_localizedString(forKey:value:table:))
+        guard
+            let original = class_getInstanceMethod(cls, originalSel),
+            let swizzled = class_getInstanceMethod(cls, swizzledSel)
+        else { return }
+        method_exchangeImplementations(original, swizzled)
+    }
+}
+
+extension Bundle {
+    /// Swizzle 后：
+    ///   - 业务代码 `Bundle.main.localizedString(...)` → 进入这里
+    ///   - `_trace_localizedString(...)` 此时指向**原始** AppKit/Foundation 实现
+    @objc fileprivate func _trace_localizedString(
+        forKey key: String,
+        value: String?,
+        table: String?
+    ) -> String {
+        if self === Bundle.main,
+           let override = LanguageManager.shared.activeOverride {
+            return override._trace_localizedString(forKey: key, value: value, table: table)
+        }
+        return self._trace_localizedString(forKey: key, value: value, table: table)
+    }
+}
+
+// applicationDidFinishLaunching 里：
+//
+// func applicationDidFinishLaunching(_ notification: Notification) {
+//     // 必须早于任何 String(localized:) 的读取
+//     LanguageManager.shared.apply(settings.language)
+//     // ... 后续初始化 UI、状态栏、窗口等
+// }
+//
+// Settings 里切换：
+//
+// Picker("", selection: $settings.language) {
+//     Text("跟随系统").tag("system")
+//     Text("中文").tag("zh-Hans")
+//     Text("English").tag("en")
+// }
+// .onChange(of: settings.language) { LanguageManager.shared.apply($0) }
+//
+// 视图 remount：
+//
+// SettingsView()
+//     .id("settings-\(settings.language)")

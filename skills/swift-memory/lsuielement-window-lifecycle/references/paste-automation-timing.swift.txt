@@ -1,0 +1,48 @@
+// 剪贴板类 app 的"自动粘贴"时序
+// 关自己 → 激活之前的 app → 模拟 ⌘V
+// 50ms / 60ms 两段延时是实测稳定值；缩短会出现粘贴打到自己的现象。
+import Cocoa
+
+/// 在面板上记录当前 frontmost app，作为后续 activate 目标
+final class PreviousAppTracker {
+    private(set) var previousApp: NSRunningApplication?
+
+    func record() {
+        previousApp = NSWorkspace.shared.frontmostApplication
+    }
+}
+
+/// 自动粘贴：close self → activate previous → simulate paste
+func activatePreviousAppAndPaste(
+    previousApp: NSRunningApplication?,
+    closeSelf: () -> Void,
+    simulatePaste: @escaping () -> Void
+) {
+    closeSelf()
+    // 第一段：50ms 让自己的窗口关闭循环走完
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+        if let app = previousApp, !app.isActive {
+            app.activate(options: .activateIgnoringOtherApps)
+        }
+        // 第二段：60ms 让目标 app 完成激活并 key
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+            simulatePaste()
+        }
+    }
+}
+
+/// 粘贴本身通常用 CGEvent 合成 Cmd+V
+/// （要求用户授予辅助功能权限，否则事件注入失败）
+///
+/// enum PasteSimulator {
+///     static func simulatePaste() {
+///         guard AXIsProcessTrusted() else { return }
+///         let src = CGEventSource(stateID: .combinedSessionState)
+///         let down = CGEvent(keyboardEventSource: src, virtualKey: 0x09, keyDown: true)
+///         let up   = CGEvent(keyboardEventSource: src, virtualKey: 0x09, keyDown: false)
+///         down?.flags = .maskCommand
+///         up?.flags   = .maskCommand
+///         down?.post(tap: .cghidEventTap)
+///         up?.post(tap: .cghidEventTap)
+///     }
+/// }

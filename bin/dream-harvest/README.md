@@ -22,7 +22,7 @@
 默认支持的来源：
 
 - `codex`
-- `claude-code`
+- `claude-code`（含 Claude Code CLI 与 IntelliJ `idea-claude-code-gui` 插件，两者共用 `~/.claude/projects/`）
 - `jetbrains-ai`
 
 ## 输出结果

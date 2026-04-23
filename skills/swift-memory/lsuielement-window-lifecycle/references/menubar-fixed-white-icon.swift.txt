@@ -1,0 +1,29 @@
+// 菜单栏图标：绕过 AppKit 的 template 自动 tint
+// AppKit 会根据菜单栏当前深浅把 template 图像自动反色；
+// 深色菜单栏下白线图标会被染黑看不清、浅色下反之。
+// 如果 app 希望图标在任何菜单栏主题下都保持同一颜色（比如始终白色），
+// 需要预渲染一份，且 isTemplate = false 让 AppKit 不做自动反色。
+import Cocoa
+
+func makeFixedWhiteMenuBarImage(named name: String) -> NSImage? {
+    guard let base = NSImage(named: name) else { return nil }
+    let size = base.size
+    let tinted = NSImage(size: size, flipped: false) { rect in
+        // 1. 先把原图画进去（作为 alpha 蒙版）
+        base.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
+        // 2. 再用 sourceAtop 把所有非透明像素涂成白色
+        NSColor.white.set()
+        rect.fill(using: .sourceAtop)
+        return true
+    }
+    tinted.isTemplate = false   // 关键：不让 AppKit 再做自动 tint
+    return tinted
+}
+
+// 使用：
+// let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+// if let button = item.button {
+//     button.image = makeFixedWhiteMenuBarImage(named: "MenuBarIcon")
+// }
+//
+// 反面需求（图标跟随菜单栏主题自动反色）：不要做这步，直接把 pdf/png 的 isTemplate 设为 true

@@ -1,0 +1,27 @@
+<!--
+  CHECKBOX · 复选按钮组（字典驱动）
+  占位符：
+    {{NAME}}            字段中文名
+    {{VAL_KEY}}         字段标识
+    {{WORDBOOK_BLOCK}}  <wordbook>...</wordbook> 整段，从 business-dict skill 对应字典的片段拷贝，
+                        并把其中 {{VALUE}} 替换为用户确认过的分类码
+  multi_select=1 多选；elem_width=12 常用于占满整行
+-->
+            <properties>
+                <auto_branch>0</auto_branch>
+                <elem_width type="Integer">12</elem_width>
+                <first_line_two_spaces>0</first_line_two_spaces>
+                <hide_title>0</hide_title>
+                <html_type>CHECKBOX</html_type>
+                <is_back>0</is_back>
+                <is_edit>1</is_edit>
+                <is_empty>1</is_empty>
+                <is_null>1</is_null>
+                <is_show>0</is_show>
+                <is_system_fields>1</is_system_fields>
+                <multi_select>1</multi_select>
+                <name>{{NAME}}</name>
+                <option_type>dynamic</option_type>
+                <val_key>{{VAL_KEY}}</val_key>
+                {{WORDBOOK_BLOCK}}
+            </properties>

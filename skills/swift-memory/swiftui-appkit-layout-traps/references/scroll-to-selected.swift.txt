@@ -1,0 +1,39 @@
+// 键盘上下切换选中行时，把 ScrollViewProxy.scrollTo 稳住
+// 两个根因：
+//   1. ForEach(_.enumerated(), id: \.element.id) 的 id 仅用于 diff，不总是暴露为 scrollTo 目标
+//   2. scrollTo 与 selectedIndex 变更同 tick 调，SwiftUI 还没测量新行位置
+import SwiftUI
+
+struct KeyboardScrollableList<Item: Identifiable, RowContent: View>: View {
+    let items: [Item]
+    @Binding var selectedIndex: Int
+    let row: (Int, Item) -> RowContent
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
+                        row(idx, item)
+                            .id(item.id)   // ← 1. 显式 view id，给 scrollTo 一个可定位锚
+                    }
+                }
+            }
+            .onChange(of: selectedIndex) { newIdx in
+                guard items.indices.contains(newIdx) else { return }
+                let targetId = items[newIdx].id
+                // ← 2. 延一帧，等 state 应用完、新行位置测量完
+                DispatchQueue.main.async {
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        proxy.scrollTo(targetId, anchor: .center)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 用法：
+// KeyboardScrollableList(items: items, selectedIndex: $selectedIndex) { idx, item in
+//     Row(item: item, isSelected: idx == selectedIndex)
+// }

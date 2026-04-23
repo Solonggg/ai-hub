@@ -1,0 +1,73 @@
+// macOS 三档主题（light / dark / system）的集中 apply 实现
+import Cocoa
+
+enum AppTheme: String { case light, dark, system }
+
+final class AppearanceManager {
+    private static var systemAppearanceObserver: NSObjectProtocol?
+
+    /// 订阅 macOS 系统深/浅切换 —— 用户当前主题为 .system 时回调里重 apply
+    static func startObservingSystemAppearance(_ onChange: @escaping () -> Void) {
+        guard systemAppearanceObserver == nil else { return }
+        systemAppearanceObserver = DistributedNotificationCenter.default.addObserver(
+            forName: Notification.Name("AppleInterfaceThemeChangedNotification"),
+            object: nil,
+            queue: .main
+        ) { _ in onChange() }
+    }
+
+    static func stopObservingSystemAppearance() {
+        if let o = systemAppearanceObserver {
+            DistributedNotificationCenter.default.removeObserver(o)
+            systemAppearanceObserver = nil
+        }
+    }
+
+    /// 集中 apply —— 用户改主题、或系统外观变化（.system 下）都走这里
+    static func applyTheme(_ theme: AppTheme) {
+        let resolved: NSAppearance = {
+            switch theme {
+            case .light:
+                return NSAppearance(named: .aqua) ?? NSApp.effectiveAppearance
+            case .dark:
+                return NSAppearance(named: .darkAqua) ?? NSApp.effectiveAppearance
+            case .system:
+                // 坑 1：必须先清 override 再采样，但采样不要用 effectiveAppearance —
+                // 刚清掉 override 时它可能仍返回旧值（macOS 26 实测）。
+                // 改读全局偏好 key，与 AppleInterfaceThemeChangedNotification 同源。
+                NSApp.appearance = nil
+                let isDark = UserDefaults.standard
+                    .string(forKey: "AppleInterfaceStyle") == "Dark"
+                return NSAppearance(named: isDark ? .darkAqua : .aqua)
+                    ?? NSApp.effectiveAppearance
+            }
+        }()
+
+        NSApp.appearance = resolved
+
+        // 坑 2：SwiftUI .preferredColorScheme(.dark) 会把 NSHostingView 自身
+        // appearance pin 成 darkAqua，此值继承优先级 > window.appearance。
+        // 只改 window.appearance 会被 contentView 残留覆盖，UI 继续深色。
+        // 必须同时刷 contentView，才能盖掉 SwiftUI 残留。
+        for window in NSApp.windows {
+            window.appearance = resolved
+            window.contentView?.appearance = resolved
+            window.contentView?.needsDisplay = true
+            invalidateSubviews(window.contentView)
+        }
+    }
+
+    private static func invalidateSubviews(_ view: NSView?) {
+        guard let v = view else { return }
+        v.needsDisplay = true
+        for s in v.subviews { invalidateSubviews(s) }
+    }
+}
+
+// 用法（在 applicationDidFinishLaunching 里）：
+//
+// AppearanceManager.applyTheme(settings.theme)
+// AppearanceManager.startObservingSystemAppearance { [weak self] in
+//     guard let self, self.settings.theme == .system else { return }
+//     AppearanceManager.applyTheme(.system)
+// }

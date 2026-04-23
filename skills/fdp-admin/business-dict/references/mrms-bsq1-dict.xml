@@ -1,0 +1,51 @@
+<!--
+  字典名：病案数据字典
+  业务域：病案首页 / 住院病历 / 门诊诊断
+  字段系列前缀：bsq*
+
+  业务域命中条件：
+    - val_key 前缀：rcz* / rcn* / ltb* / bce*
+    - 文件名关键词：病案 / 首页 / 住院 / 门诊诊断
+
+  元数据：
+    id              = 1656561581176385536
+    name            = 病案数据字典
+    field_key       = bsq03
+    value_key       = bsq01
+    show_key        = bsq02
+    render_key      = bsq02
+    search_key 列表 = abbrw, bsq02, bsq01, abbrp
+
+  默认分类码：无（必须由用户指定）
+
+  使用方式：拷贝下方 <wordbook>...</wordbook>，把 {{VALUE}} 替换为用户确认过的分类码，
+            填入 fdp-form 模板里的 {{WORDBOOK_BLOCK}} 占位符
+-->
+<wordbook>
+    <conObj type="List">
+        <properties>
+            <compare_field>_custom__input_</compare_field>
+            <con>EQ</con>
+            <field_key>bsq03</field_key>
+            <unit>NULL</unit>
+            <value>{{VALUE}}</value>
+        </properties>
+    </conObj>
+    <id>1656561581176385536</id>
+    <name>病案数据字典</name>
+    <primary_key>id</primary_key>
+    <render_key type="List">
+        <value>bsq02</value>
+    </render_key>
+    <search_key type="List">
+        <value>abbrw</value>
+        <value>bsq02</value>
+        <value>bsq01</value>
+        <value>abbrp</value>
+    </search_key>
+    <show_key type="List">
+        <value>bsq02</value>
+    </show_key>
+    <type>TABLELIST</type>
+    <value_key>bsq01</value_key>
+</wordbook>

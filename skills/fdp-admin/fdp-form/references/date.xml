@@ -1,0 +1,31 @@
+<!--
+  DATE · 日期 / 日期时间
+  占位符：
+    {{NAME}}        字段中文名
+    {{VAL_KEY}}     字段标识
+    {{DATE_FORMAT}} 日期格式，默认 yyyy-MM-dd HH:mm:ss；仅日期用 yyyy-MM-dd
+  说明：
+    condition / max_date_condition / min_date_condition 必须都保留，否则前端日期控件会异常
+-->
+            <properties>
+                <auto_branch>0</auto_branch>
+                <condition>0</condition>
+                <date_format>{{DATE_FORMAT}}</date_format>
+                <elem_width type="Integer">3</elem_width>
+                <first_line_two_spaces>0</first_line_two_spaces>
+                <hide_title>0</hide_title>
+                <html_type>DATE</html_type>
+                <is_back>0</is_back>
+                <is_edit>1</is_edit>
+                <is_empty>1</is_empty>
+                <is_null>1</is_null>
+                <is_show>0</is_show>
+                <is_system_fields>1</is_system_fields>
+                <max_date_condition>0</max_date_condition>
+                <max_date_unit>DAY</max_date_unit>
+                <min_date_condition>0</min_date_condition>
+                <min_date_unit>DAY</min_date_unit>
+                <name>{{NAME}}</name>
+                <unit>DAY</unit>
+                <val_key>{{VAL_KEY}}</val_key>
+            </properties>

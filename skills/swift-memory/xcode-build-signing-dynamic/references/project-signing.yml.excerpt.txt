@@ -1,0 +1,42 @@
+# project.yml 签名相关片段（xcodegen 格式）
+# 关键点：
+#   - CODE_SIGN_IDENTITY 使用 ${VAR} 占位，由 build.sh 在 generate 前注入
+#   - 只写到 **app target** 的 settings.base 下，不写全局 settings
+#   - SPM 包继承默认 Automatic 签名，与 app target 的 Manual 隔离
+
+name: MyApp
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    macOS: "26.0"
+  xcodeVersion: "26.0"
+
+# ⚠️ 全局 settings 不要定义 CODE_SIGN_IDENTITY —— 否则 SPM 包也被强制 Manual，
+#     构建时报 "conflicting provisioning settings"
+settings:
+  base:
+    DEVELOPMENT_TEAM: TEAMID12AB      # ← 改成自己的 team id
+    CODE_SIGN_STYLE: Manual
+
+packages:
+  SomeSPM:
+    url: https://github.com/x/y
+    version: 1.0.0
+
+targets:
+  MyApp:
+    type: application
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: MyApp
+    dependencies:
+      - package: SomeSPM
+    settings:
+      base:
+        # ↓ CODE_SIGN_IDENTITY 只写到 app target；build.sh 注入 SHA-1
+        CODE_SIGN_IDENTITY: ${MYAPP_CODE_SIGN_IDENTITY}
+        PROVISIONING_PROFILE_SPECIFIER: ""
+        INFOPLIST_FILE: MyApp/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.myapp
+        CODE_SIGN_ENTITLEMENTS: MyApp/MyApp.entitlements

@@ -1,0 +1,96 @@
+// 稳定配方：borderless NSWindow + SwiftUI glassEffect + CALayer 裁圆
+import Cocoa
+import SwiftUI
+
+// 1. 子类化：borderless 窗口默认 canBecomeKey = false，必须显式允许
+private final class PanelBorderlessWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+}
+
+final class GlassSettingsWindow {
+    private var window: NSWindow?
+    /// 两处 cornerRadius 共享同一常量，避免 SwiftUI 裁边与 CALayer 裁边不一致
+    private static let cornerRadius: CGFloat = 12
+
+    func show<Content: View>(content: Content,
+                             width: CGFloat = 620,
+                             height: CGFloat = 460) {
+        if let existing = window {
+            existing.makeKeyAndOrderFront(nil)
+            Self.wakeCompositor(existing)
+            return
+        }
+
+        // 2. styleMask .borderless —— 去掉 themeFrame 的 hairline 暗描边
+        let w = PanelBorderlessWindow(
+            contentRect: NSRect(x: 0, y: 0, width: width, height: height),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+
+        let hostView = NSHostingView(rootView: content)
+        hostView.frame = NSRect(x: 0, y: 0, width: width, height: height)
+
+        // 3. CALayer 层裁圆 —— 防止 SwiftUI material composite 渗到窗口矩形边缘
+        hostView.wantsLayer = true
+        hostView.layer?.cornerRadius = Self.cornerRadius
+        hostView.layer?.cornerCurve = .continuous
+        hostView.layer?.masksToBounds = true
+        hostView.layer?.backgroundColor = NSColor.clear.cgColor
+
+        // 4. 窗口透明三件套 + 阴影
+        w.backgroundColor = .clear
+        w.isOpaque = false
+        w.hasShadow = true
+        w.isMovableByWindowBackground = true
+        w.contentView = hostView
+        w.isReleasedWhenClosed = false
+        w.center()
+
+        window = w
+        w.makeKeyAndOrderFront(nil)
+
+        // 5. 首帧唤醒合成器
+        Self.wakeCompositor(w)
+    }
+
+    /// 冷启动（系统刚重启）时 Metal 合成器可能未热身，首帧 .glassEffect 会回退成纯色。
+    /// 延一帧 invalidateShadow() + displayIfNeeded() 强制重绘，效果恢复为真实玻璃。
+    private static func wakeCompositor(_ w: NSWindow) {
+        DispatchQueue.main.async { [weak w] in
+            w?.invalidateShadow()
+            w?.displayIfNeeded()
+        }
+    }
+}
+
+// 6. SwiftUI 内使用的 glass 封装 —— 注意 cornerRadius 必须与 CALayer 的一致
+struct LiquidGlassBackground: ViewModifier {
+    var cornerRadius: CGFloat = 12
+    func body(content: Content) -> some View {
+        content.glassEffect(
+            .regular,
+            in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        )
+    }
+}
+
+extension View {
+    func liquidGlass(cornerRadius: CGFloat = 12) -> some View {
+        modifier(LiquidGlassBackground(cornerRadius: cornerRadius))
+    }
+}
+
+// 用法示例：
+// struct MyContent: View {
+//     var body: some View {
+//         VStack { Text("Hello") }
+//             .frame(width: 620, height: 460)
+//             .liquidGlass(cornerRadius: 12)   // ← 与 GlassSettingsWindow.cornerRadius 相同
+//     }
+// }
+//
+// let controller = GlassSettingsWindow()
+// controller.show(content: MyContent())

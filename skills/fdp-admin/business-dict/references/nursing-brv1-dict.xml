@@ -1,0 +1,56 @@
+<!--
+  字典名：护理文书字典
+  业务域：护理文书 / 体征 / 评估 / 巡视
+  字段系列前缀：brv*
+
+  业务域命中条件：
+    - val_key 前缀：brv* / 以及常见护理语义名（如 tempPartCd、pulseCd 等）
+    - 文件名关键词：护理 / 体征 / 评估 / 巡视
+
+  元数据：
+    id              = 1572136674515001344
+    name            = 护理文书字典
+    field_key       = brv04
+    value_key       = brv02
+    show_key        = brv03
+    render_key      = brv03
+    search_key 列表 = brv02, abbrw, brv03, abbrp
+
+  默认分类码：无（必须由用户指定）
+
+  差异说明：
+    - <conObj> 用 <is_compare_field type="Boolean">false</is_compare_field> 而不是 <compare_field>_custom__input_</compare_field>
+    - 独立含 <openWindowType>pop</openWindowType>
+    - 切换时整段照搬，不要只改一两个节点
+
+  使用方式：拷贝下方 <wordbook>...</wordbook>，把 {{VALUE}} 替换为用户确认过的分类码，
+            填入 fdp-form 模板里的 {{WORDBOOK_BLOCK}} 占位符
+-->
+<wordbook>
+    <conObj type="List">
+        <properties>
+            <con>EQ</con>
+            <field_key>brv04</field_key>
+            <is_compare_field type="Boolean">false</is_compare_field>
+            <value>{{VALUE}}</value>
+        </properties>
+    </conObj>
+    <id>1572136674515001344</id>
+    <name>护理文书字典</name>
+    <openWindowType>pop</openWindowType>
+    <primary_key>id</primary_key>
+    <render_key type="List">
+        <value>brv03</value>
+    </render_key>
+    <search_key type="List">
+        <value>brv02</value>
+        <value>abbrw</value>
+        <value>brv03</value>
+        <value>abbrp</value>
+    </search_key>
+    <show_key type="List">
+        <value>brv03</value>
+    </show_key>
+    <type>TABLELIST</type>
+    <value_key>brv02</value_key>
+</wordbook>

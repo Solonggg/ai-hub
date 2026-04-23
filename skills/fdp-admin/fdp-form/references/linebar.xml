@@ -1,0 +1,18 @@
+<!--
+  LINEBAR · 分组标题栏（把后续字段聚合到一个折叠分组下）
+  占位符：
+    {{NAME}}    分组中文名
+    {{VAL_KEY}} 分组标识（常见命名：bar_xxx / xxxBar）
+  说明：
+    不是业务字段，没有 wordbook / validate
+    is_show=1（默认展示），is_not_fold=0 允许折叠
+-->
+            <properties>
+                <html_type>LINEBAR</html_type>
+                <is_back>0</is_back>
+                <is_not_fold>0</is_not_fold>
+                <is_show>1</is_show>
+                <is_system_fields>1</is_system_fields>
+                <name>{{NAME}}</name>
+                <val_key>{{VAL_KEY}}</val_key>
+            </properties>

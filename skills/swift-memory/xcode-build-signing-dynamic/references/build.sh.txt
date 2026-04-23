@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# 个人 Xcode 项目本机构建脚本模板
+# 设计目标：
+#   - 证书轮换零改动（从 keychain 现查 SHA）
+#   - SPM 包不受 manual signing 影响（变量只在 app target 生效）
+#   - 冷编译进度可见（xcbeautify 或 cat 流式输出）
+#
+# 使用：把 MyApp / MYAPP_ 替换成自己的项目名即可。
+set -euo pipefail
+
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_ROOT"
+
+SCHEME="MyApp"
+PROJECT="MyApp.xcodeproj"
+CONFIG="${1:-Debug}"
+EXPORT_PATH="dist"
+
+# --- 1. 从 keychain 现查 Apple Development 证书 SHA-1 ---
+SIGN_LINE=$(security find-identity -p codesigning -v 2>/dev/null \
+    | awk -F'"' '/Apple Development/ {print $0; exit}')
+
+if [ -z "$SIGN_LINE" ]; then
+    echo "==> 错误：keychain 里找不到 Apple Development 证书。"
+    echo "    Xcode → Settings → Accounts → Manage Certificates → + → Apple Development"
+    echo "    然后运行：security find-identity -p codesigning -v"
+    exit 1
+fi
+
+MYAPP_CODE_SIGN_IDENTITY=$(echo "$SIGN_LINE" | awk '{print $2}')
+export MYAPP_CODE_SIGN_IDENTITY
+
+# --- 2. 按需重 generate xcodeproj ---
+# 触发条件：project.yml 比 pbxproj 新；或 pbxproj 里 SHA 不再是当前证书（轮换）
+NEED_REGEN=0
+if [ ! -f "$PROJECT/project.pbxproj" ] \
+   || [ "project.yml" -nt "$PROJECT/project.pbxproj" ]; then
+    NEED_REGEN=1
+elif ! grep -q "$MYAPP_CODE_SIGN_IDENTITY" "$PROJECT/project.pbxproj"; then
+    NEED_REGEN=1
+fi
+
+if [ "$NEED_REGEN" = "1" ]; then
+    echo "==> Generating Xcode project (identity $MYAPP_CODE_SIGN_IDENTITY)..."
+    xcodegen generate
+else
+    echo "==> Using existing $PROJECT"
+fi
+
+# --- 3. 流式输出 ---
+# xcbeautify 可用就用（格式化、行号着色）；否则直接 cat，宁可粗糙也不要截断
+if command -v xcbeautify >/dev/null 2>&1; then
+    FORMATTER=(xcbeautify)
+else
+    FORMATTER=(cat)
+fi
+
+echo "==> Building ($CONFIG)..."
+xcodebuild \
+    -project "$PROJECT" \
+    -scheme "$SCHEME" \
+    -destination 'platform=macOS' \
+    -configuration "$CONFIG" \
+    -skipPackagePluginValidation \
+    -skipMacroValidation \
+    -allowProvisioningUpdates \
+    ONLY_ACTIVE_ARCH=YES \
+    build \
+    | "${FORMATTER[@]}"
+
+# --- 4. Release 构建打包到 dist/ ---
+if [ "$CONFIG" = "Release" ]; then
+    APP_PATH=$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" \
+        -configuration "$CONFIG" -showBuildSettings 2>/dev/null \
+        | awk -F' = ' '/^ *BUILT_PRODUCTS_DIR/ {print $2; exit}')/MyApp.app
+    if [ -d "$APP_PATH" ]; then
+        mkdir -p "$EXPORT_PATH"
+        rm -rf "$EXPORT_PATH/MyApp.app"
+        cp -R "$APP_PATH" "$EXPORT_PATH/MyApp.app"
+        echo "==> Exported: $EXPORT_PATH/MyApp.app"
+    fi
+fi
+
+echo "==> Done."

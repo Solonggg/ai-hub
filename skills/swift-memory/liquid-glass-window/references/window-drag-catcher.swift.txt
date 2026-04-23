@@ -1,0 +1,32 @@
+// borderless NSWindow/NSPanel 的可拖拽区域
+// 不用 SwiftUI DragGesture（经过 NSHostingView 会静默失效），
+// 也不用 NSView.mouseDownCanMoveWindow（SwiftUI 嵌入场景行为不稳），
+// 直接调 window.performDrag(with:) —— AppKit 的规范路径，彻底绕开 SwiftUI 事件路由
+import SwiftUI
+import AppKit
+
+/// 使用：挂到**非交互**的 chrome 行（header / footer 等）上即可。
+/// 含 ScrollView / Button 的区域不要挂，会吞掉它们的 mouseDown。
+///
+///     footerBar
+///         .overlay(WindowDragCatcher())
+///
+struct WindowDragCatcher: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { CatcherView() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    private final class CatcherView: NSView {
+        override func mouseDown(with event: NSEvent) {
+            window?.performDrag(with: event)
+        }
+        override func resetCursorRects() {
+            addCursorRect(bounds, cursor: .openHand)
+        }
+    }
+}
+
+// 全窗口拖拽的另一条路：设置 window.isMovableByWindowBackground = true。
+// 取舍：
+//   - isMovableByWindowBackground：所有非交互像素都可拖；但 ScrollView 滚动条也可能被误当拖拽
+//   - WindowDragCatcher：精确控制哪些区域可拖；代价是手动标注拖拽区
+// 内含可滚动列表的面板优先选 WindowDragCatcher；纯展示型用 isMovableByWindowBackground。

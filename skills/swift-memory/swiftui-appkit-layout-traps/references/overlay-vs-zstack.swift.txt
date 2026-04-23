@@ -1,0 +1,59 @@
+// 在 SwiftUI 里把小组件钉在某区域的角落：overlay 正例 vs ZStack+Spacer 反例
+import SwiftUI
+
+// ❌ 反例：VStack 里的 Spacer 让 ZStack 变 flex-height，吞掉父容器空间
+//
+// struct BadToolbar: View {
+//     var body: some View {
+//         VStack(spacing: 0) {
+//             ZStack {
+//                 HStack { tabs }                                    // 自然高度
+//                 VStack {                                           // ← 毒药起点
+//                     HStack { closeButton; Spacer() }
+//                     Spacer(minLength: 0)                           // ← 让 ZStack 变 flex
+//                 }
+//             }
+//             Divider()
+//             ScrollView { content }                                 // ← 被挤到视口外
+//         }
+//     }
+// }
+//
+// 根因：VStack 的 Spacer 表达"我愿意扩展"，SwiftUI 把 ZStack 也标成 flex-height，
+// 于是 toolbar 在父 VStack 里贪婪吃掉几乎所有垂直空间，其他 sibling（ScrollView）被压扁。
+
+// ✅ 正例：.overlay(alignment:) 不参与父测量，toolbar 保持自然高度
+struct ToolbarWithCornerButton: View {
+    var body: some View {
+        HStack(spacing: 4) {
+            Spacer()
+            ForEach(sampleTabs) { t in tabButton(t) }
+            Spacer()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .overlay(alignment: .topLeading) {
+            CloseButton()
+                .padding(.leading, 10)
+                .padding(.top, 10)
+        }
+    }
+
+    private var sampleTabs: [Tab] { [] }
+    private func tabButton(_ t: Tab) -> some View { Text(t.name) }
+}
+
+struct Tab: Identifiable { let id = UUID(); let name: String }
+
+struct CloseButton: View {
+    var body: some View {
+        Circle()
+            .fill(Color(red: 1, green: 0.37, blue: 0.36))
+            .frame(width: 12, height: 12)
+    }
+}
+
+// 判断指南：
+//   - 元素在同一 layer 上参与布局协商 → ZStack / VStack / HStack
+//   - 元素只是"贴图"，不影响另一元素尺寸 → .overlay / .background
+//   - 需要指定角落位置用 alignment 参数：.topLeading / .topTrailing / .bottomLeading / .bottomTrailing

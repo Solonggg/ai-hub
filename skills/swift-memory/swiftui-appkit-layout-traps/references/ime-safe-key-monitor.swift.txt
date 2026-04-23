@@ -1,0 +1,44 @@
+// 在 SwiftUI 里用 NSEvent.addLocalMonitor 监听键盘时，
+// 中文/日文/韩文输入法组字期间候选窗口需要方向键切候选。
+// 如果不放行，用户的输入法体验会被应用快捷键吃掉。
+//
+// 规则：hasMarkedText == true 直接 return event，让系统先处理。
+import SwiftUI
+import AppKit
+
+final class KeyMonitorController {
+    private var keyMonitor: Any?
+
+    /// handler 返回 nil 表示消费事件，返回 event 表示放行
+    func install(handler: @escaping (NSEvent) -> NSEvent?) {
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // 1. IME 组字期间一律放行，不要动
+            if NSTextInputContext.current?.client.hasMarkedText() == true {
+                return event
+            }
+            return handler(event)
+        }
+    }
+
+    func remove() {
+        if let m = keyMonitor {
+            NSEvent.removeMonitor(m)
+            keyMonitor = nil
+        }
+    }
+}
+
+// 用法（面板里键盘导航）：
+//
+// let km = KeyMonitorController()
+// km.install { event in
+//     let isCmd = event.modifierFlags.contains(.command)
+//     switch Int(event.keyCode) {
+//     case 126:                 moveSelection(-1); return nil   // ↑
+//     case 125:                 moveSelection( 1); return nil   // ↓
+//     case  36:                 confirmSelection(); return nil  // ⏎
+//     case  53:                 dismiss(); return nil           // esc
+//     case  51 where isCmd:     deleteSelection(); return nil   // ⌘⌫
+//     default:                  return event
+//     }
+// }

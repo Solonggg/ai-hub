@@ -1,0 +1,22 @@
+// LSUIElement app 切换 .regular / .accessory 时，AppKit 会短暂 deactivate 当前 app，
+// 正打开的 key 窗口会"消失"（NSWindow 实例还活着，但不再前置也不 key）。
+// 解决：切 policy 前快照可见窗口，切完主动 activate + 重 orderFront。
+import Cocoa
+
+func setDockIconVisible(_ visible: Bool) {
+    let app = NSApplication.shared
+    let newPolicy: NSApplication.ActivationPolicy = visible ? .regular : .accessory
+    guard app.activationPolicy() != newPolicy else { return }
+
+    // 1. 快照 —— 要在切 policy 之前记录，之后 window.isVisible 已经变了
+    let visibleWindows = app.windows.filter { $0.isVisible }
+
+    // 2. 切 policy
+    app.setActivationPolicy(newPolicy)
+
+    // 3. 恢复 —— activate 之后再 orderFront，让窗口回到前台且 key
+    app.activate(ignoringOtherApps: true)
+    for window in visibleWindows {
+        window.makeKeyAndOrderFront(nil)
+    }
+}

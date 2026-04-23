@@ -1,0 +1,55 @@
+<!--
+  字典名：健康档案数据字典
+  业务域：健康档案 / 孕产妇保健 / 儿童保健 / 公卫
+  字段系列前缀：bzd*
+
+  业务域命中条件：
+    - val_key 前缀：rdu* / reu* / rfo* / rdn*
+    - 文件名关键词：健康档案 / 妇保 / 孕产 / 儿保 / 公卫
+
+  元数据：
+    id              = 1805779154922295296
+    name            = 健康档案数据字典
+    field_key       = bzd03
+    value_key       = bzd01
+    show_key        = bzd02
+    render_key      = bzd02
+    search_key 列表 = abbrw, bzd02, abbrp
+
+  默认分类码：无（必须由用户指定）
+  常见分类码：
+    141 = YWQKDMB（有无情况）
+    138 = YWDMB（有无基础）
+    117 = GJDMB（国籍）
+    303 = MZFLDMB（民族）
+
+  使用方式：拷贝下方 <wordbook>...</wordbook>，把 {{VALUE}} 替换为用户确认过的分类码，
+            填入 fdp-form 模板里的 {{WORDBOOK_BLOCK}} 占位符
+-->
+<wordbook>
+    <conObj type="List">
+        <properties>
+            <compare_field>_custom__input_</compare_field>
+            <con>EQ</con>
+            <field_key>bzd03</field_key>
+            <unit>NULL</unit>
+            <value>{{VALUE}}</value>
+        </properties>
+    </conObj>
+    <id>1805779154922295296</id>
+    <name>健康档案数据字典</name>
+    <primary_key>id</primary_key>
+    <render_key type="List">
+        <value>bzd02</value>
+    </render_key>
+    <search_key type="List">
+        <value>abbrw</value>
+        <value>bzd02</value>
+        <value>abbrp</value>
+    </search_key>
+    <show_key type="List">
+        <value>bzd02</value>
+    </show_key>
+    <type>TABLELIST</type>
+    <value_key>bzd01</value_key>
+</wordbook>

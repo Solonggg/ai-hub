@@ -1,0 +1,65 @@
+// LSUIElement 应用的设置窗口模板
+// 要点：
+//   - show 前主动 NSApp.activate
+//   - 已有实例复用，不重建 NSHostingView
+//   - isReleasedWhenClosed = false
+//   - 从面板跳来时延一帧（在调用方处理）
+import Cocoa
+import SwiftUI
+
+private final class SettingsPanelWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+}
+
+final class SettingsWindowController<Content: View> {
+    private var window: NSWindow?
+    private let buildContent: (_ onClose: @escaping () -> Void) -> Content
+
+    init(buildContent: @escaping (_ onClose: @escaping () -> Void) -> Content) {
+        self.buildContent = buildContent
+    }
+
+    func show(width: CGFloat = 620, height: CGFloat = 460) {
+        // 1. LSUIElement app 默认非活动，先激活否则窗口被 frontmost app 盖住
+        NSApp.activate(ignoringOtherApps: true)
+
+        // 2. 复用实例：isReleasedWhenClosed = false 时 NSHostingView 还活着
+        if let existing = window {
+            existing.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        let w = SettingsPanelWindow(
+            contentRect: NSRect(x: 0, y: 0, width: width, height: height),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        let content = buildContent { [weak w] in w?.close() }
+        let hostView = NSHostingView(rootView: content)
+        hostView.frame = NSRect(x: 0, y: 0, width: width, height: height)
+        hostView.wantsLayer = true
+
+        w.backgroundColor = .clear
+        w.isOpaque = false
+        w.hasShadow = true
+        w.isMovableByWindowBackground = true
+        w.contentView = hostView
+        w.center()
+        w.isReleasedWhenClosed = false   // 3. 关键：保住实例
+
+        window = w
+        w.makeKeyAndOrderFront(nil)
+    }
+}
+
+// 调用方：从 HUD 面板跳到设置的典型写法
+//
+// @objc func openSettingsFromPanel() {
+//     panelWindow.close()
+//     // 4. 延一帧：LSUIElement 里挤在同 tick 会被旧 frontmost 盖住
+//     DispatchQueue.main.async {
+//         self.settingsController.show()
+//     }
+// }
