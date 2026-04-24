@@ -1,10 +1,10 @@
 ## fdp-admin · FDP 表单字段 + 字典一体化 skills
 
-本目录收纳两个配合使用的 skill，专门处理 fdp-admin（`fdp/sourceFile/**/form/*.xml`）`Sform` 表单的字段新增与字典挂接。
+本目录收纳两个配合使用的 skill，专门处理 fdp-admin（`fdp/sourceFile/**/form/*.xml`）`Sform` 表单的字段新增/修改与字典挂接。
 
 ```
 fdp-admin/
-├── fdp-form/          # 表单字段新增
+├── fdp-form/          # 表单字段新增/修改
 │   ├── SKILL.md
 │   └── references/    # 10 个 html_type 模板（input / textarea / digital / date / search / search_more / radio / checkbox / select / linebar）
 └── business-dict/     # 业务域字典库
@@ -17,86 +17,81 @@ fdp-admin/
 ### 触发方式
 两个 skill 都按 CLAUDE.md 的触发条件自动激活：
 
-- **fdp-form**：匹配到 `Sform` 根节点的 XML 新增 `<properties>` 字段节点
-- **business-dict**：需要挂 `<wordbook>` 字典片段，或在 `references/` 下加字典
+- **fdp-form**：在 `Sform` 根节点 XML 中新增或修改 `<properties>` 字段节点；覆盖 INPUT/TEXTAREA/DIGITAL/DATE/SEARCH/SEARCH_MORE/RADIO/CHECKBOX/SELECT/LINEBAR 全部 html_type；口语触发词——"加字段""新增字段""往表单里加输入框/下拉/日期/单选/多选""FDP 表单加字段"
+- **business-dict**：给 SEARCH/SEARCH_MORE/RADIO/CHECKBOX/SELECT 字段挂 `<wordbook>` 片段、选业务域字典（健康档案/病案/护理等），或在 `references/` 下加字典；被 fdp-form 处理字典字段时自动联动；口语触发词——"挂字典""配字典""换字典""这个字段用哪本字典""分类码"
 
 ### 协作流程
 ```
-用户说"在 xxx.xml 新增字段 yyy，类型 SEARCH，挂 X 字典"
+用户贴字段清单（列定义 / ApiModelProperty）到目标 XML
     ↓
-fdp-form 接管，校验 val_key + 读目标 XML 风格
+fdp-form 接管：Read 目标 XML，Grep 每个 val_key 是否已占用，观察同文件字段风格
     ↓
-字段是字典类型（SEARCH / SEARCH_MORE / RADIO / CHECKBOX / SELECT）
+存在字典字段（SEARCH / SEARCH_MORE / RADIO / CHECKBOX / SELECT）
     ↓
 fdp-form 通过 Skill 工具调用 business-dict
     ↓
-business-dict 按决策流程（沿用 → 业务域命中 → 问用户）定位字典
+business-dict 按决策流程（沿用目标 XML 已有字典 → 业务域命中 → 问用户）定位字典
     ↓
-返回完整 <wordbook> 片段（{{VALUE}} 已替换为分类码）
+返回完整 <wordbook> 片段（{{VALUE}} 已替换为确认过的分类码）
     ↓
-fdp-form 以 markdown 表格预览字段列表等用户确认
+fdp-form 输出"待新增字段" markdown 表格；若有冲突/已存在字段再单独输出"已存在字段"表格
     ↓
-用户确认 → 选模板 → 替换占位符 → Edit 写入 → XML 合法性自检
+用户确认 → 选模板 → 机械替换占位符 → Edit 写入 → ET.parse 合法性自检
+    ↓
+落地后再输出"本次实际写入字段"最终结果表格
 ```
 
 关键设计：
 - **预览前置**：字典字段强制先查 business-dict 再预览，禁止凭记忆填字典
+- **双表分离**：预览阶段"待新增字段"与"已存在字段"必须拆成两张表，避免用户误判哪些真正落地
+- **表格双关卡**：预览表格（动码前） + 最终结果表格（落地后）都必须输出；预览不能替代最终
 - **文件即配置**：新增字典只需往 `business-dict/references/` 丢文件，无需改任何 SKILL.md
 - **模板即事实**：`fdp-form/references/*.xml` 是每种 html_type 的权威模板，机械替换占位符即可，不再推断
 
 ## 使用示例
 
-### 示例 ：新增字段
-```
-在表单@file:/Users/wangjie/workspace/project/fdp/sourceFile/100504/form/2044609262595911682.xml 中追加以下字段
+### 示例：新增字段
 
-rft02	timestamp(6)	检查日期
-rft26	varchar(18)	登记机构代码
-rft27	varchar(80)	登记机构名称
+两种等价输入方式（列定义 / ApiModelProperty）都支持：
+
+```
+在表单@file:/form/2044609262595911682.xml 中追加以下字段
+
+rft23	varchar(18)	检查机构代码
 rft30	timestamp(6)	登记日期时间
-rft03	varchar(400)	临床处置
-rft04	varchar(1000)	医生指导
 rft05	varchar(2)	是否分娩 #bzd03=151
-rft06	varchar(18)	分娩机构代码
-rft07	varchar(80)	分娩机构名称
-rft08	varchar(2)	妊娠风险专案是否结案 #bzd03=151
 ```
-
 或者
-
 ```
-在表单@file:/Users/wangjie/workspace/project/fdp/sourceFile/100504/form/2044609262595911682.xml 中 家庭地址 字段的后面继续追加以下字段
-
-@ApiModelProperty("是否转诊 #bzd03=151")
-private String rft10;
-
-@ApiModelProperty("是否分娩 #bzd03=151")
-private String rft05;
-
-@ApiModelProperty("是否预约 #bzd03=151")
-private String rft15;
+在表单@file:/form/2044609262595911682.xml 中 家庭地址 字段的后面继续追加以下字段
 
 @ApiModelProperty("检查机构代码")
 private String rft23;
 
-@ApiModelProperty("检查机构名称")
-private String rft24;
-
 @ApiModelProperty("登记日期时间")
 private LocalDateTime rft30;
+
+@ApiModelProperty("是否分娩 #bzd03=151")
+private String rft05;
 ```
 
-fdp-form 会：
-1. 读 `2044609262595911682.xml`，Grep `上述提供的字段` 确认未占用
-2. 输出预览表格：
+fdp-form 接管后会：
 
-   | # | val_key | name | html_type | 必填 | 多选 | 字典 | 备注 |
+1. Read `2044609262595911682.xml`；Grep `rft23` / `rft30` / `rft05` 确认未占用，观察同文件字段风格（是否含 `labelColor` / `placeholder` / `name_i18n` 等）
+2. 识别到 `rft05` 带 `#bzd03=151` 分类码标注 → 通过 Skill 调用 business-dict，按决策流程定位字典并返回完整 `<wordbook>` 片段
+3. 输出"待新增字段"预览表格：
+
+   | # | val_key | name | html_type | 必填 | 多选 | 字典（字典名 / 分类码） | 备注 |
    |---|---|---|---|---|---|---|---|
-   | 1 | phone_no | 联系电话 | INPUT | 否 | — | — | max_length=20 |
+   | 1 | rft23 | 检查机构代码 | INPUT | 否 | — | — | max_length=18 |
+   | 2 | rft30 | 登记日期时间 | DATE | 否 | — | — | date_format=yyyy-MM-dd HH:mm:ss |
+   | 3 | rft05 | 是否分娩 | SEARCH | 否 | 否 | 健康档案数据字典 / bzd03=151 | 沿用目标 XML 已有字典 |
 
-3. 用户回复"确认"后，打开 `fdp-form/references/*.xml`，把 `{{NAME}}`/`{{VAL_KEY}}`/`{{MAX_LENGTH}}` 替换为 `字段名`/`字段编码`/`字段长度（非必需，默认 300)`
-4. 在 `</formFieldList>` 之前插入新节点
-5. 用 `python3 -c "import xml.etree.ElementTree as ET; ET.parse('...')"` 自检
+   若存在 `val_key` 冲突或目标 XML 已有同名字段，再单独输出"已存在字段"表格（列：`# / val_key / name / 当前状态 / 备注`）
+4. 用户回复"确认" → 按示例 2 的"家庭地址字段后面"锚点，或默认在 `</formFieldList>` 之前插入
+5. 打开 `fdp-form/references/{html_type}.xml`，机械替换 `{{NAME}}` / `{{VAL_KEY}}` / `{{MAX_LENGTH}}` / `{{DATE_FORMAT}}` / `{{WORDBOOK_BLOCK}}` 等占位符
+6. `python3 -c "import xml.etree.ElementTree as ET; ET.parse('...')"` 验证合法；Grep 新 `<val_key>` 命中且仅命中 1 次
+7. 再次输出"本次实际写入字段"最终结果表格（列同第 3 步），用户直接核对落地内容
 
 
 ## 如何添加其他字典
@@ -161,6 +156,8 @@ fdp-form 会：
 ## 常见坑速查
 
 - **预览不可跳过**：fdp-form 要求先以 markdown 表格 echo 字段列表，用户回复"确认"才能动 Edit
+- **已存在字段必须单独成表**：不能和"待新增字段"混在同一张表，否则用户无法直接判断哪些真正落地
+- **落地后必须再输出 markdown 表格**：预览表格不能替代最终结果表格，最终表格以实际写入内容为准
 - **跨业务域串字典**：最高发错误。决策第 1 步先看目标 XML 已有 `<wordbook><id>`
 - **html_type 必须全大写**
 - **日期字段必须配齐** `date_format` + `condition` + `max_date_condition` + `min_date_condition` + `unit` + `max_date_unit` + `min_date_unit`

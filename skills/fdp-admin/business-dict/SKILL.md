@@ -1,6 +1,6 @@
 ---
 name: business-dict
-description: 在 fdp-admin 表单字段挂接 `<wordbook>` 字典片段、为字段选择业务域字典、或在 `references/` 新增一本字典文件时使用；通常由 `fdp-form` 处理字典字段时自动调用
+description: 在 fdp-admin 表单给 SEARCH/SEARCH_MORE/RADIO/CHECKBOX/SELECT 字段挂接 `<wordbook>` 字典片段、选择业务域字典（健康档案/病案/护理等）、或在 `references/` 新增字典文件时使用。触发词："挂字典""配字典""换字典""这个字段用哪本字典""分类码"。被 `fdp-form` 处理字典字段时自动联动调用。
 ---
 
 # business-dict · fdp-admin 业务域字典库
