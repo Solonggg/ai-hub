@@ -3,7 +3,7 @@
 ## 目录结构
 
 ```
-~/workspace/LLM Wiki/iho/
+~/workspace/LLMWiki/iho/
 ├── 病案/
 │   ├── _index.json
 │   └── *.md
@@ -114,7 +114,7 @@ archive_at: "2026-04-29T18:15:00+08:00"
 ## index.md 全局索引维护
 
 ### 文件位置与定位
-- 路径：`~/workspace/LLM Wiki/iho/index.md`（脚本内需 `os.path.expanduser` 或 shell 自动展开 `~`）
+- 路径：`~/workspace/LLMWiki/iho/index.md`（脚本内需 `os.path.expanduser` 或 shell 自动展开 `~`）
 - 结构：`## wiki目录` 章节下分三个二级子章节 `### 病案` / `### 护理` / `### 健康档案`，每个子章节内一张 7 列 Markdown 表格
 
 ### 章节定位规则

@@ -10,7 +10,7 @@
 2. 在 `markdown-body` 之前的 DOM 中抽 `author` / `updated_at`
 3. 用 `markitdown` 把 `markdown-body` 转成 Markdown，**保留远程图片 URL**
 4. 按关键词命中得分判定 `病案 / 护理 / 健康档案`，歧义就停下提问
-5. 写入 `~/workspace/LLM Wiki/iho/<分类>/<标题>-YYYYMMDDHHMMSS.md`，含 8 字段 Front Matter
+5. 写入 `~/workspace/LLMWiki/iho/<分类>/<标题>-YYYYMMDDHHMMSS.md`，含 8 字段 Front Matter
 6. 按 `source_url + content_hash` 去重，更新分类下 `_index.json`
 7. 同步 `iho/index.md` 全局索引（按归档日期正序）
 
@@ -80,7 +80,7 @@ python3 -m markitdown -x html /tmp/mb.html -o /tmp/page.md
 ## 落盘位置
 
 ```
-~/workspace/LLM Wiki/iho/
+~/workspace/LLMWiki/iho/
 ├── index.md                # 全局索引（人读视图，按业务域分组的 7 列表）
 ├── 病案/
 │   ├── _index.json         # 去重权威源（机器读，4 字段）
