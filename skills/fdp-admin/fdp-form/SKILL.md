@@ -1,6 +1,6 @@
 ---
 name: fdp-form
-description: 在 fdp-admin 表单 XML（Sform 根节点，通常位于 `fdp/sourceFile/**/form/*.xml`）中新增 `<properties>` 字段节点时使用
+description: 在 fdp-admin 表单 XML（`fdp/sourceFile/**/form/*.xml`，Sform 根节点）中新增或修改 `<properties>` 字段节点时使用。覆盖 INPUT/TEXTAREA/DIGITAL/DATE/SEARCH/SEARCH_MORE/RADIO/CHECKBOX/SELECT/LINEBAR 全部 html_type。触发词："加字段""新增字段""往表单里加输入框/下拉/日期/单选/多选""FDP 表单加字段"。字典字段会自动联动 business-dict。
 ---
 
 # fdp-form · FDP 表单字段新增
@@ -64,19 +64,25 @@ description: 在 fdp-admin 表单 XML（Sform 根节点，通常位于 `fdp/sour
 
 ### 3. 预览确认（强制关卡，不可跳过）
 
-动代码前**必须**以 markdown 表格列出全部新增字段等用户批准。用户显式回复"确认 / OK / 可以"之前：**不得调用 Edit / Write**。
+动代码前**必须**以 markdown 表格列出待新增字段，必要时再单独用 markdown 表格列出已存在字段，等用户批准。用户显式回复"确认 / OK / 可以"之前：**不得调用 Edit / Write**。
 
-表格列：
+待新增字段表格列：
 
 | # | val_key | name | html_type | 必填 | 多选 | 字典（字典名 / 分类码） | 备注 |
 
 非字典字段的"多选""字典"列填 `—`。
 
+如果存在 `val_key` 冲突、同名字段已存在、或用户提供的字段在目标 XML 中已经存在，**必须**再单独输出“已存在字段”表格，不得与“待新增字段”混在同一个表格里。
+
+已存在字段表格列：
+
+| # | val_key | name | 当前状态 | 备注 |
+
 表格外同步声明：
 - **插入位置**：默认 `</formFieldList>` 之前或用户指定锚字段
 - **所用字典及判断依据**（"沿用目标 XML 已有字典 → 病案数据字典" 之类）
 - **待确认项**：分类码未知 / `val_key` 冲突 / 字典编码无法解析
-- **被跳过字段**：如 `sysId` 等非 UI 字段、已存在的 `val_key`
+- **被跳过字段**：如 `sysId` 等非 UI 字段；已存在字段不要只在这里一句话带过，必须体现在“已存在字段”独立表格里
 
 用户修改参数 → 重新渲染表格。**反复预览 → 一次落地**，好于边改边问。
 
@@ -108,7 +114,10 @@ description: 在 fdp-admin 表单 XML（Sform 根节点，通常位于 `fdp/sour
 ### 6. 写入后自检
 - `python3 -c "import xml.etree.ElementTree as ET; ET.parse('{xml_path}')"` 验证合法
 - `Grep` 确认新 `<val_key>` 命中**且仅命中 1 次**
-- 输出改动摘要：新增字段 + 插入位置 + 默认生效的属性
+- 修改完成后，**必须**以 markdown 表格输出本次实际修改的字段内容
+- 表格列至少包含：`#` / `val_key` / `name` / `html_type` / `必填` / `多选` / `字典（字典名 / 分类码）` / `备注`
+- 表格只列本次实际写入或实际修改的字段；未改动字段不要混入
+- 表格外再补充改动摘要：新增字段 + 插入位置 + 默认生效的属性
 
 ## 字段属性速查
 
@@ -127,6 +136,8 @@ description: 在 fdp-admin 表单 XML（Sform 根节点，通常位于 `fdp/sour
 ## 常见坑
 
 - **预览 → 确认 → 改码，顺序不可颠倒，预览不可跳过，且必须用 markdown 表格预览**：参数再明确也要先 markdown 表格 echo 一遍
+- **已存在字段必须单独成表**：不要把“待新增”和“已存在”混在一个表里，否则用户无法直接判断哪些会真正落地
+- **落地后仍要再输出 markdown 表格**：预览表格不能替代最终结果表格，最终表格必须反映实际已写入内容
 - **`html_type` 必须全大写**
 - **不要跨字典串用**：高发错误（把病案字段挂到健康档案字典）。新增字典字段前先 `Grep` 目标 XML 现有 `<wordbook><id>` 对齐，判定以 `business-dict` 决策流程为准
 - **不要跨风格串模板**：目标文件不带的标签（`labelColor` / `placeholder` / `name_i18n` 等）不要凭空加，先 `Grep` 同文件样例
