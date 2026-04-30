@@ -27,13 +27,13 @@
 3. 完成后同步分发产物：
 
 ```bash
-/Users/wangjie/ai-hub/bin/publish-skills/publish-skills
+~/ai-hub/bin/publish-skills/publish-skills
 ```
 
 4. 最后用诊断命令确认 `dist/` 与安装目录状态：
 
 ```bash
-/Users/wangjie/ai-hub/bin/doctor/doctor
+~/ai-hub/bin/doctor/doctor
 ```
 
 ## 注意事项
